@@ -8,10 +8,14 @@ namespace TopoCursor;
 ///   idle  – fermo da poco: respira, muove i baffi, sbatte le palpebre
 ///   sleep – fermo da molto: dorme con le Z
 ///   bite  – al click addenta il formaggio (one-shot, poi torna a idle/run)
+///   drag  – trascinamento: si aggrappa al formaggio
+///   hold  – tasto premuto ma fermo durante un trascinamento: abbraccia il formaggio
+/// Non dipende dalla piattaforma: riceve input da Windows (hook) o Linux (XInput2) e disegna su un IOverlay.
 /// </summary>
 public sealed class PetController
 {
-    readonly Overlay _overlay;
+    readonly IOverlay _overlay;
+    readonly IPointerSource _pointer;
     readonly Stopwatch _clock = Stopwatch.StartNew();
 
     SpriteSet _sprites;
@@ -44,12 +48,13 @@ public sealed class PetController
 
     public bool Paused { get; private set; }
 
-    public PetController(Overlay overlay, SpriteSet sprites, BehaviorConfig behavior)
+    public PetController(IOverlay overlay, IPointerSource pointer, SpriteSet sprites, BehaviorConfig behavior)
     {
         _overlay = overlay;
+        _pointer = pointer;
         _sprites = sprites;
         _b = behavior;
-        if (Native.GetCursorPos(out var p)) { _x = p.X; _y = p.Y; _hasPos = true; }
+        if (_pointer.TryGetPosition(out var x, out var y)) { _x = x; _y = y; _hasPos = true; }
     }
 
     double Now => _clock.Elapsed.TotalMilliseconds;
@@ -69,7 +74,7 @@ public sealed class PetController
         else { _lastActivityMs = Now; Render(); }
     }
 
-    /// <summary>Movimento riportato dall'hook (fonte principale e più tempestiva).</summary>
+    /// <summary>Movimento riportato dalla fonte di eventi della piattaforma (hook / XInput2): la più tempestiva.</summary>
     public void OnMove(int x, int y)
     {
         _lastHookMs = Now;
@@ -125,15 +130,15 @@ public sealed class PetController
         Render();
     }
 
-    bool IsDragButton(MouseButtons button) => _b.DragButton.ToLowerInvariant() switch
+    bool IsDragButton(PetButton button) => _b.DragButton.ToLowerInvariant() switch
     {
-        "left" => button == MouseButtons.Left,
-        "right" => button == MouseButtons.Right,
-        "middle" => button == MouseButtons.Middle,
+        "left" => button == PetButton.Left,
+        "right" => button == PetButton.Right,
+        "middle" => button == PetButton.Middle,
         _ => false,
     };
 
-    public void OnButtonUp(MouseButtons button)
+    public void OnButtonUp(PetButton button)
     {
         if (IsDragButton(button)) EndDrag();
     }
@@ -148,7 +153,7 @@ public sealed class PetController
         Render();
     }
 
-    public void OnButton(MouseButtons button)
+    public void OnButton(PetButton button)
     {
         if (IsDragButton(button))
         {
@@ -158,8 +163,8 @@ public sealed class PetController
 
         bool match = _b.BiteOn.ToLowerInvariant() switch
         {
-            "left" => button == MouseButtons.Left,
-            "right" => button == MouseButtons.Right,
+            "left" => button == PetButton.Left,
+            "right" => button == PetButton.Right,
             _ => true,
         };
         if (!match) return;
@@ -178,14 +183,14 @@ public sealed class PetController
         double dt = Math.Clamp(now - _lastTickMs, 0, 250);
         _lastTickMs = now;
 
-        // Fallback solo se l'hook tace (es. finestra con privilegi più alti in primo piano).
-        // Mentre l'hook è attivo NON va usato: l'hook riceve la posizione nuova un attimo prima che
-        // Windows sposti davvero il cursore, e GetCursorPos potrebbe restituire quella vecchia
-        // facendo "rimbalzare" il topo all'indietro (e girarsi per un istante).
-        if (now - _lastHookMs > 50 && Native.GetCursorPos(out var p) && (p.X != _x || p.Y != _y)) MoveTo(p.X, p.Y);
+        // Fallback solo se la fonte di eventi tace (es. su Windows una finestra elevata in primo piano,
+        // su Linux un server X senza XInput2). Mentre gli eventi arrivano NON va usato: su Windows l'hook
+        // riceve la posizione nuova un attimo prima che il cursore si sposti davvero, e il polling
+        // restituirebbe quella vecchia facendo "rimbalzare" il topo all'indietro (e girarsi per un istante).
+        if (now - _lastHookMs > 50 && _pointer.TryGetPosition(out var px, out var py) && (px != _x || py != _y)) MoveTo(px, py);
 
-        // fallback se l'hook perde il rilascio del tasto (es. rilasciato sopra una finestra elevata)
-        if (_dragBtnDown && !AnyButtonDown()) EndDrag();
+        // fallback se si perde il rilascio del tasto (es. rilasciato sopra una finestra elevata)
+        if (_dragBtnDown && !_pointer.AnyButtonDown()) EndDrag();
 
         if (now - _lastMoveEventMs > 60) _speed *= 0.8;
 
@@ -218,10 +223,6 @@ public sealed class PetController
         double t = Math.Clamp(_speed / Math.Max(_b.RunSpeedForMaxFps, 1), 0, 1);
         return _b.RunFpsMin + (_b.RunFpsMax - _b.RunFpsMin) * t;
     }
-
-    static bool AnyButtonDown() =>
-        ((Native.GetAsyncKeyState(Native.VK_LBUTTON) | Native.GetAsyncKeyState(Native.VK_RBUTTON) |
-          Native.GetAsyncKeyState(Native.VK_MBUTTON)) & 0x8000) != 0;
 
     void UpdateState(double now)
     {

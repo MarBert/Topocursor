@@ -8,16 +8,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>TopoCursor</AssemblyName>
     <RootNamespace>TopoCursor</RootNamespace>
-    <ApplicationIcon>assets\topo.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\assets\topo.ico</ApplicationIcon>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="tools\**" />
-    <None Remove="tools\**" />
-    <EmbeddedResource Include="assets\mouse.png" LogicalName="mouse.png" />
-    <EmbeddedResource Include="assets\config.json" LogicalName="config.json" />
+    <ProjectReference Include="..\Core\TopoCursor.Core.csproj" />
   </ItemGroup>
 
 </Project>

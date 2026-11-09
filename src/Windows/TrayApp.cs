@@ -34,7 +34,7 @@ public sealed class TrayApp : ApplicationContext
         (_cfg, _sprites, var trayBmp) = LoadAll(showErrors: true);
         SetTrayIcon(trayBmp);
 
-        _pet = new PetController(_overlay, _sprites, _cfg.Behavior);
+        _pet = new PetController(_overlay, WinPointer.Instance, _sprites, _cfg.Behavior);
         _hook = new MouseHook();
         _hook.Moved += _pet.OnMove;
         _hook.ButtonDown += _pet.OnButton;
@@ -79,9 +79,8 @@ public sealed class TrayApp : ApplicationContext
             var cfg = ConfigStore.Load();
             var png = Path.Combine(ConfigStore.Dir, cfg.Spritesheet);
             var bytes = File.ReadAllBytes(png); // niente lock sul file: si può sovrascrivere mentre gira
-            var sprites = SpriteSet.Load(cfg, new MemoryStream(bytes));
-            var tray = SpriteSet.MakeTrayBitmap(cfg, new MemoryStream(bytes));
-            return (cfg, sprites, tray);
+            var sprites = SpriteSet.Load(cfg, bytes, GdiFrameFactory.Instance);
+            return (cfg, sprites, GdiFrameFactory.ToBitmap(SpriteSet.MakeIcon(cfg, bytes)));
         }
         catch (Exception ex)
         {
@@ -89,9 +88,9 @@ public sealed class TrayApp : ApplicationContext
                 MessageBox.Show($"Non riesco a caricare la configurazione:\n{ex.Message}\n\nUso lo sprite di default.",
                     "TopoCursor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             var cfg = ConfigStore.LoadEmbedded();
-            using var s1 = ConfigStore.OpenEmbedded("mouse.png");
-            using var s2 = ConfigStore.OpenEmbedded("mouse.png");
-            return (cfg, SpriteSet.Load(cfg, s1), SpriteSet.MakeTrayBitmap(cfg, s2));
+            var bytes = ConfigStore.ReadEmbedded("mouse.png");
+            return (cfg, SpriteSet.Load(cfg, bytes, GdiFrameFactory.Instance),
+                GdiFrameFactory.ToBitmap(SpriteSet.MakeIcon(cfg, bytes)));
         }
     }
 

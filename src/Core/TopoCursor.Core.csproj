@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Codice condiviso fra Windows e Linux: configurazione, decoder PNG, sprite, macchina a stati. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TopoCursor</RootNamespace>
+    <AssemblyName>TopoCursor.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\mouse.png" LogicalName="mouse.png" />
+    <EmbeddedResource Include="..\..\assets\config.json" LogicalName="config.json" />
+  </ItemGroup>
+
+</Project>

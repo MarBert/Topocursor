@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- TopoCursor per Linux (X11): nessun pacchetto esterno, solo P/Invoke verso libX11/libXext/libXfixes/libXi. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TopoCursor.Linux</RootNamespace>
+    <AssemblyName>topocursor</AssemblyName>
+    <Version>1.1.0</Version>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\TopoCursor.Core.csproj" />
+  </ItemGroup>
+
+</Project>

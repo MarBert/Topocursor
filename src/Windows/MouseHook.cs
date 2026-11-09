@@ -10,8 +10,8 @@ public sealed class MouseHook : IDisposable
     IntPtr _hook;
 
     public event Action<int, int>? Moved;
-    public event Action<MouseButtons>? ButtonDown;
-    public event Action<MouseButtons>? ButtonUp;
+    public event Action<PetButton>? ButtonDown;
+    public event Action<PetButton>? ButtonUp;
 
     public MouseHook()
     {
@@ -31,12 +31,12 @@ public sealed class MouseHook : IDisposable
                 switch ((int)wParam)
                 {
                     case WM_MOUSEMOVE: Moved?.Invoke(info.pt.X, info.pt.Y); break;
-                    case WM_LBUTTONDOWN: ButtonDown?.Invoke(MouseButtons.Left); break;
-                    case WM_RBUTTONDOWN: ButtonDown?.Invoke(MouseButtons.Right); break;
-                    case WM_MBUTTONDOWN: ButtonDown?.Invoke(MouseButtons.Middle); break;
-                    case WM_LBUTTONUP: ButtonUp?.Invoke(MouseButtons.Left); break;
-                    case WM_RBUTTONUP: ButtonUp?.Invoke(MouseButtons.Right); break;
-                    case WM_MBUTTONUP: ButtonUp?.Invoke(MouseButtons.Middle); break;
+                    case WM_LBUTTONDOWN: ButtonDown?.Invoke(PetButton.Left); break;
+                    case WM_RBUTTONDOWN: ButtonDown?.Invoke(PetButton.Right); break;
+                    case WM_MBUTTONDOWN: ButtonDown?.Invoke(PetButton.Middle); break;
+                    case WM_LBUTTONUP: ButtonUp?.Invoke(PetButton.Left); break;
+                    case WM_RBUTTONUP: ButtonUp?.Invoke(PetButton.Right); break;
+                    case WM_MBUTTONUP: ButtonUp?.Invoke(PetButton.Middle); break;
                 }
             }
             catch

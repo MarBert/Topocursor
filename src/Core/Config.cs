@@ -35,7 +35,7 @@ public sealed class BehaviorConfig
     public string DragButton { get; set; } = "left";
     /// <summary>Pixel di movimento col tasto premuto prima che diventi un trascinamento.</summary>
     public int DragThresholdPx { get; set; } = 5;
-    /// <summary>"all", "pointers" (freccia, mano, attesa) o "none".</summary>
+    /// <summary>"all", "pointers" (freccia, mano, attesa; solo Windows, su Linux equivale ad "all") o "none".</summary>
     public string HideSystemCursor { get; set; } = "all";
 }
 
@@ -54,8 +54,8 @@ public sealed class AppConfig
 
 /// <summary>
 /// Trova/crea la cartella di configurazione.
-/// Modalità portable: config.json accanto all'exe. Altrimenti %APPDATA%\TopoCursor
-/// (creata al primo avvio con config e sprite di default).
+/// Modalità portable: config.json accanto all'eseguibile. Altrimenti %APPDATA%\TopoCursor su Windows
+/// o ~/.config/topocursor su Linux (creata al primo avvio con config e sprite di default).
 /// </summary>
 public static class ConfigStore
 {
@@ -80,7 +80,9 @@ public static class ConfigStore
             Dir = exeDir;
             return;
         }
-        Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TopoCursor");
+        // Windows: %APPDATA%\TopoCursor — Linux: $XDG_CONFIG_HOME/topocursor (di solito ~/.config/topocursor)
+        Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            OperatingSystem.IsWindows() ? "TopoCursor" : "topocursor");
         Directory.CreateDirectory(Dir);
         if (!File.Exists(ConfigPath)) ExtractDefaults(Dir);
     }
@@ -96,8 +98,16 @@ public static class ConfigStore
     }
 
     public static Stream OpenEmbedded(string name) =>
-        Assembly.GetExecutingAssembly().GetManifestResourceStream(name)
+        typeof(ConfigStore).Assembly.GetManifestResourceStream(name)
         ?? throw new InvalidOperationException($"Risorsa incorporata mancante: {name}");
+
+    public static byte[] ReadEmbedded(string name)
+    {
+        using var s = OpenEmbedded(name);
+        using var ms = new MemoryStream();
+        s.CopyTo(ms);
+        return ms.ToArray();
+    }
 
     public static AppConfig Load()
     {

@@ -6,7 +6,7 @@ namespace TopoCursor;
 /// Finestra popup layered, trasparente ai click, sempre in primo piano e fuori dalla taskbar.
 /// Disegna un frame con alpha per-pixel tramite UpdateLayeredWindow.
 /// </summary>
-public sealed class Overlay : NativeWindow, IDisposable
+public sealed class Overlay : NativeWindow, IOverlay, IDisposable
 {
     public const int HotkeyId = 0x7070;
     public event Action? HotkeyPressed;
@@ -33,7 +33,7 @@ public sealed class Overlay : NativeWindow, IDisposable
     {
         if (ReferenceEquals(f, _lastFrame) && x == _lastX && y == _lastY && _visible) return;
 
-        var old = SelectObject(_memDc, f.HBitmap);
+        var old = SelectObject(_memDc, (IntPtr)f.Native!);
         if (_origBmp == IntPtr.Zero) _origBmp = old;
 
         var dst = new POINT { X = x, Y = y };
