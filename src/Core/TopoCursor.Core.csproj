@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Codice condiviso fra Windows e Linux: configurazione, decoder PNG, sprite, macchina a stati. -->
+  <!-- Code shared by Windows and Linux: configuration, PNG decoder, sprites, state machine. -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>

@@ -3,10 +3,10 @@ using static TopoCursor.Native;
 
 namespace TopoCursor;
 
-/// <summary>Hook globale low-level sul mouse: posizione immediata e click, senza consumarli.</summary>
+/// <summary>Global low-level mouse hook: immediate position and clicks, without consuming them.</summary>
 public sealed class MouseHook : IDisposable
 {
-    readonly LowLevelMouseProc _proc; // va tenuto in vita finché l'hook è attivo
+    readonly LowLevelMouseProc _proc; // must stay alive while the hook is installed
     IntPtr _hook;
 
     public event Action<int, int>? Moved;
@@ -18,7 +18,7 @@ public sealed class MouseHook : IDisposable
         _proc = Callback;
         _hook = SetWindowsHookEx(WH_MOUSE_LL, _proc, GetModuleHandle(null), 0);
         if (_hook == IntPtr.Zero)
-            throw new InvalidOperationException($"SetWindowsHookEx fallito (errore {Marshal.GetLastWin32Error()})");
+            throw new InvalidOperationException($"SetWindowsHookEx failed (error {Marshal.GetLastWin32Error()})");
     }
 
     IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -41,7 +41,7 @@ public sealed class MouseHook : IDisposable
             }
             catch
             {
-                // Mai far fallire l'hook: Windows lo rimuoverebbe e il mouse sembrerebbe "laggare".
+                // Never let the hook throw: Windows would remove it and the mouse would seem to "lag".
             }
         }
         return CallNextHookEx(_hook, nCode, wParam, lParam);

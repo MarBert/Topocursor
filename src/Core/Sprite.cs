@@ -3,17 +3,17 @@ using System.Drawing;
 namespace TopoCursor;
 
 /// <summary>
-/// Un frame già scalato. <see cref="Pixels"/> è ARGB premoltiplicato (0xAARRGGBB), riga per riga dall'alto:
-/// in memoria little-endian sono byte BGRA, il formato che vogliono sia UpdateLayeredWindow sia X11 a 32 bit.
+/// An already-scaled frame. <see cref="Pixels"/> is premultiplied ARGB (0xAARRGGBB), row by row from the top:
+/// in little-endian memory these are BGRA bytes, the format both UpdateLayeredWindow and 32-bit X11 expect.
 /// </summary>
 public sealed class Frame
 {
     public required int Width { get; init; }
     public required int Height { get; init; }
     public required uint[] Pixels { get; init; }
-    /// <summary>Punto del frame (già scalato) che va sotto la posizione reale del puntatore.</summary>
+    /// <summary>Point of the (already scaled) frame that sits under the real pointer position.</summary>
     public required Point Hotspot { get; init; }
-    /// <summary>Risorsa della piattaforma (HBITMAP su Windows, Pixmap su X11) creata dall'IFrameFactory.</summary>
+    /// <summary>Platform resource (HBITMAP on Windows, Pixmap on X11) created by the IFrameFactory.</summary>
     public object? Native { get; internal set; }
 }
 
@@ -25,7 +25,7 @@ public sealed class Animation
     public int Count => Right.Length;
 }
 
-/// <summary>Spritesheet a righe: ogni animazione occupa una riga, i frame vanno da sinistra a destra.</summary>
+/// <summary>Row-based sprite sheet: each animation takes one row, frames go left to right.</summary>
 public sealed class SpriteSet : IDisposable
 {
     readonly Dictionary<string, Animation> _anims = new(StringComparer.OrdinalIgnoreCase);
@@ -57,7 +57,7 @@ public sealed class SpriteSet : IDisposable
             {
                 if (def.Frames <= 0) continue;
                 if ((def.Row + 1) * fh > sh || def.Frames * fw > sw)
-                    throw new InvalidDataException($"L'animazione \"{name}\" esce dai bordi dello spritesheet ({sw}x{sh}).");
+                    throw new InvalidDataException($"Animation \"{name}\" goes past the edges of the sprite sheet ({sw}x{sh}).");
 
                 var asIs = new Frame[def.Frames];
                 var mirrored = new Frame[def.Frames];
@@ -75,7 +75,7 @@ public sealed class SpriteSet : IDisposable
                     Fps = def.Fps > 0 ? def.Fps : 8,
                 };
             }
-            if (!set._anims.ContainsKey("idle")) throw new InvalidDataException("Manca l'animazione \"idle\".");
+            if (!set._anims.ContainsKey("idle")) throw new InvalidDataException("Missing the \"idle\" animation.");
         }
         catch
         {
@@ -86,8 +86,8 @@ public sealed class SpriteSet : IDisposable
     }
 
     /// <summary>
-    /// Ritaglio quadrato del primo frame di "idle" attorno all'hotspot, ingrandito a <paramref name="size"/>
-    /// (nearest neighbor). Pixel ARGB non premoltiplicati. Usato per l'icona della tray.
+    /// Square crop of the first "idle" frame around the hotspot, scaled to <paramref name="size"/>
+    /// (nearest neighbor). Non-premultiplied ARGB pixels. Used for the tray icon.
     /// </summary>
     public static Image32 MakeIcon(AppConfig cfg, byte[] png, int size = 32)
     {
@@ -117,7 +117,7 @@ public sealed class SpriteSet : IDisposable
                 uint argb = sheet[(sy + y) * sheetW + sx + (flip ? fw - 1 - x : x)];
                 uint a = argb >> 24;
                 if (a == 0) continue;
-                // premoltiplica alpha (richiesto da UpdateLayeredWindow e dai compositor X11)
+                // premultiply alpha (required by UpdateLayeredWindow and by X11 compositors)
                 uint r = ((argb >> 16) & 0xFF) * a / 255;
                 uint g = ((argb >> 8) & 0xFF) * a / 255;
                 uint b = (argb & 0xFF) * a / 255;

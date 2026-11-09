@@ -1,99 +1,99 @@
 # 🐭 TopoCursor
 
-Il cursore del mouse diventa un topolino in pixel art:
+Your mouse pointer becomes a little pixel-art mouse:
 
-| Cosa fai | Cosa fa il topo |
+| What you do | What the mouse does |
 |---|---|
-| muovi il mouse | **corre** (più vai veloce, più zampetta veloce) e si gira verso dove vai |
-| ti fermi | **si riposa**: respira, muove i baffi, sbatte le palpebre |
-| resti fermo ~8 s | **si addormenta** con le Z |
-| clicchi | **addenta un pezzo di formaggio** (click ripetuti = sgranocchia) |
-| trascini (tasto sinistro premuto + movimento) | **si aggrappa al formaggio** e si fa trasportare, zampe a penzoloni |
-| ti fermi a metà trascinamento | **abbraccia il formaggio** (con cuoricino) |
+| move the pointer | **runs**: the faster you move, the faster its legs go, and it turns to face where you're heading |
+| stop | **rests**: breathes, twitches its whiskers, blinks |
+| stay still for ~8 s | **falls asleep**, with Z's |
+| click | **bites a piece of cheese**: repeated clicks make it nibble |
+| drag (left button held + movement) | **hangs on to the cheese** and gets carried along, legs dangling |
+| pause mid-drag | **hugs the cheese**, with a little heart |
 
-Il punto che "clicca" è la **punta del naso**.
+The point that "clicks" is the **tip of its nose**.
 
-![anteprima](docs/mouse_preview.gif)
+![preview](docs/mouse_preview.gif)
 
-Funziona su **Windows 10/11** e su **Linux con X11** (vedi [Linux](#linux)).
+Runs on **Windows 10/11** and on **Linux with X11** (see [Linux](#linux)).
 
-## Struttura
+## Project layout
 
 ```
 TopoCursor.sln
-assets/            config.json, mouse.png, topo.ico (condivisi)
-src/Core/          config, decoder PNG, sprite, macchina a stati: niente codice di piattaforma
-src/Windows/       overlay layered, hook del mouse, tray (WinForms)          → TopoCursor.exe
-src/Linux/         overlay X11, XInput2, XFixes                              → topocursor
-tools/             generatore dello spritesheet di default
+assets/            config.json, mouse.png, topo.ico (shared)
+src/Core/          config, PNG decoder, sprites, state machine: no platform code
+src/Windows/       layered overlay, mouse hook, tray icon (WinForms)          → TopoCursor.exe
+src/Linux/         X11 overlay, XInput2, XFixes                               → topocursor
+tools/             generator for the default sprite sheet
 ```
 
 ## Windows
 
-Serve il .NET 8 SDK (va bene anche Visual Studio 2022, aprendo `TopoCursor.sln`).
+You need the .NET 8 SDK. Visual Studio 2022 also works: open `TopoCursor.sln`.
 
 ```powershell
 .\run.ps1
 ```
 
-Compila, avvia e resta in attesa: **Ctrl+C chiude l'app in modo pulito** e il cursore torna normale. Se PowerShell blocca gli script per la execution policy, usa `.\run.cmd`, che fa la stessa cosa.
+This builds the app, starts it and waits. **Ctrl+C closes the app cleanly** and the normal pointer comes back. If PowerShell blocks scripts because of the execution policy, use `.\run.cmd`, which does the same thing.
 
-Da qualsiasi terminale puoi anche chiudere l'istanza in esecuzione con `src\Windows\bin\Release\net8.0-windows\TopoCursor.exe --quit`.
+From any terminal you can also close the running instance with `src\Windows\bin\Release\net8.0-windows\TopoCursor.exe --quit`.
 
-Per compilare senza avviare: `dotnet build src\Windows -c Release` (oppure `dotnet build -c Release` per tutta la soluzione).
+To build without running: `dotnet build src\Windows -c Release`, or `dotnet build -c Release` for the whole solution.
 
-Evita invece `dotnet run` seguito da Ctrl+C: l'app viene uccisa senza poter fare pulizia, e solo il processo guardiano rimette a posto il cursore.
+Avoid `dotnet run` followed by Ctrl+C: the app is killed before it can clean up, and only the watchdog process puts the pointer back.
 
-Per un exe singolo da mettere dove vuoi:
+For a single exe you can put anywhere:
 
 ```bat
 publish.cmd
 ```
 
-`publish\TopoCursor.exe` richiede il .NET 8 Desktop Runtime. Dentro `publish.cmd` c'è anche la variante self-contained, che non ha prerequisiti.
+`publish\TopoCursor.exe` needs the .NET 8 Desktop Runtime. `publish.cmd` also contains a self-contained variant, which has no prerequisites.
 
-Una volta partito, l'app vive nella **tray** (icona col topolino). Dal menu puoi:
+Once started, the app lives in the **system tray** (mouse icon). From its menu you can choose:
 
-- **In pausa**: torna il cursore normale (anche con la scorciatoia **Ctrl+Alt+M**, o con doppio click sull'icona)
-- **Dimensione**: scegli 1×, 2×, 3× o 4×
-- **Nascondi cursore di sistema**:
-  - *Sempre*
-  - *Solo freccia e mano*: l'I-beam del testo e le frecce di ridimensionamento restano visibili
-  - *Mai*
-- **Avvia con Windows**
-- **Ripristina sprite e config di default** (utile dopo un aggiornamento che aggiunge animazioni)
-- **Apri cartella sprite/config** e **Ricarica sprite**
+- **Paused**: the normal pointer comes back. Also available with **Ctrl+Alt+M** or by double-clicking the icon.
+- **Size**: 1×, 2×, 3× or 4×
+- **Hide system pointer**:
+  - *Always*
+  - *Arrow and hand only*: the text I-beam and the resize arrows stay visible
+  - *Never*
+- **Start with Windows**
+- **Restore default sprites and config**: useful after an update that adds animations
+- **Open sprite/config folder** and **Reload sprites**
 
 ## Linux
 
-Funziona con le sessioni **X11** (Xorg), con o senza compositor. **Wayland non è supportato**: per sicurezza, sotto Wayland un'app normale non può leggere la posizione globale del puntatore né disegnare sopra le altre finestre. Se il programma rileva una sessione Wayland, si ferma e lo spiega.
+Works with **X11** (Xorg) sessions, with or without a compositor. **Wayland is not supported**: for security reasons, a regular app on Wayland can't read the global pointer position or draw on top of other windows. If the program detects a Wayland session, it stops and explains why.
 
-### 1. Controlla di essere su X11
+### 1. Check that you're on X11
 
 ```bash
 echo $XDG_SESSION_TYPE
 ```
 
-Se risponde `x11` sei a posto e puoi passare al punto 2. Se risponde `wayland`, dipende dal desktop:
+If it prints `x11`, you're good: skip to step 2. If it prints `wayland`, it depends on your desktop:
 
-| Desktop | X11 disponibile? |
+| Desktop | X11 available? |
 |---|---|
-| XFCE, Cinnamon (Linux Mint), MATE, i3, Openbox e altri window manager X11 | Sì, di solito è la sessione predefinita. |
-| KDE Plasma fino alla 6.7 | Sì: nella schermata di login scegli **Plasma (X11)**. Su alcune distro va prima installata la sessione X11 (su Arch il pacchetto `plasma-x11-session`). Da Plasma 6.8 la sessione X11 non esiste più. |
-| GNOME fino alla 48 (es. Ubuntu 24.04 LTS, Debian 13) | Sì: nella schermata di login, dopo aver scelto l'utente, clicca la rotellina in basso a destra e scegli **Ubuntu on Xorg** / **GNOME on Xorg**. |
-| GNOME 49 e successivi (es. Ubuntu 25.10 e successive, Fedora 43 e successive) | **No**: GNOME non ha più una sessione X11. L'unica strada è installare accanto un desktop X11, per esempio XFCE o Cinnamon, e sceglierlo al login. |
+| XFCE, Cinnamon (Linux Mint), MATE, i3, Openbox and other X11 window managers | Yes, usually it's the default session. |
+| KDE Plasma up to 6.7 | Yes: pick **Plasma (X11)** on the login screen. On some distros you need to install the X11 session first (on Arch, the `plasma-x11-session` package). Plasma 6.8 no longer has an X11 session. |
+| GNOME up to 48 (e.g. Ubuntu 24.04 LTS, Debian 13) | Yes: on the login screen, after choosing your user, click the gear icon in the bottom-right corner and pick **Ubuntu on Xorg** / **GNOME on Xorg**. |
+| GNOME 49 and later (e.g. Ubuntu 25.10 and later, Fedora 43 and later) | **No**: GNOME no longer has an X11 session. The only option is to install an X11 desktop alongside it, such as XFCE or Cinnamon, and pick that at login. |
 
-### 2. Installa .NET 8 SDK e librerie X11
+### 2. Install the .NET 8 SDK and the X11 libraries
 
-Le librerie X11 sono già presenti su qualsiasi desktop X11, ma il comando le installa nel caso manchino.
+The X11 libraries are already present on any X11 desktop; the commands below install them in case they're missing.
 
-**Ubuntu** (22.04 e successive)
+**Ubuntu** (22.04 and later)
 
 ```bash
 sudo apt install dotnet-sdk-8.0 libx11-6 libxext6 libxfixes3 libxi6
 ```
 
-**Debian**: .NET non è nei repository ufficiali, quindi si aggiunge prima quello Microsoft (qui per Debian 12; per un'altra versione sostituisci `12`):
+**Debian**: .NET isn't in the official repositories, so add Microsoft's repository first. The example is for Debian 12; for another release, replace `12`:
 
 ```bash
 wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb
@@ -113,16 +113,16 @@ sudo dnf install dotnet-sdk-8.0 libX11 libXext libXfixes libXi
 sudo pacman -S dotnet-sdk-8.0 libx11 libxext libxfixes libxi
 ```
 
-**Qualsiasi distro, senza root**: usa lo script ufficiale, che installa in `~/.dotnet`:
+**Any distro, without root**: use the official script, which installs into `~/.dotnet`:
 
 ```bash
 curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 8.0
 echo 'export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc && source ~/.bashrc
 ```
 
-Per controllare l'installazione: `dotnet --list-sdks` deve elencare un SDK `8.x`. Una versione più recente da sola non basta, perché per avviarlo serve il runtime 8.
+To check the installation, `dotnet --list-sdks` must list an `8.x` SDK. A newer version on its own isn't enough, because running the app needs the .NET 8 runtime.
 
-### 3. Scarica, compila e prova
+### 3. Download, build and try it
 
 ```bash
 git clone https://github.com/MarBert/Topocursor.git
@@ -130,160 +130,160 @@ cd Topocursor
 bash run.sh
 ```
 
-`run.sh` compila solo il progetto Linux e lo avvia nel terminale. **Ctrl+C** lo chiude in modo pulito, **Ctrl+Alt+M** lo mette in pausa e lo riprende.
+`run.sh` builds only the Linux project and runs it in the terminal. **Ctrl+C** closes it cleanly, and **Ctrl+Alt+M** pauses and resumes it.
 
-Al primo avvio stampa una riga come questa:
+On startup it prints a line like this:
 
 ```
-TopoCursor avviato – compositor: sì, XInput2: sì, nascondi cursore: sì.
+TopoCursor started – compositor: yes, XInput2: yes, hide pointer: yes.
 ```
 
-Le voci della riga:
+The fields:
 
-- **compositor**: con `sì` hai la trasparenza vera; con `no` funziona lo stesso, ma i bordi semitrasparenti vengono tagliati netti.
-- **XInput2**: con `no (polling)` funziona comunque, ma i tap velocissimi del touchpad potrebbero sfuggire.
+- **compositor**: with `yes` you get real transparency. With `no` it still works, but semi-transparent edges are cut sharply.
+- **XInput2**: with `no (polling)` it still works, but very quick touchpad taps may be missed.
 
-### 4. Installalo in modo permanente (facoltativo)
+### 4. Install it permanently (optional)
 
-Crea un eseguibile singolo che include .NET: puoi copiarlo dove vuoi e non serve più l'SDK.
+This creates a single executable that bundles .NET, so you can copy it anywhere and no longer need the SDK.
 
 ```bash
 bash publish.sh                                              # → publish-linux/topocursor (ARM: bash publish.sh linux-arm64)
 install -Dm755 publish-linux/topocursor ~/.local/bin/topocursor
-topocursor --autostart on                                    # parte da solo a ogni login
+topocursor --autostart on                                    # starts automatically at every login
 ```
 
-Se il terminale dice `topocursor: command not found`, la cartella `~/.local/bin` non è nel `PATH`. Esci e rientra nella sessione, oppure usa il percorso completo `~/.local/bin/topocursor`.
+If the terminal says `topocursor: command not found`, then `~/.local/bin` isn't in your `PATH`. Log out and back in, or use the full path `~/.local/bin/topocursor`.
 
-Per avviarlo subito senza terminale: `nohup topocursor >/dev/null 2>&1 &`
+To start it right away without keeping a terminal open: `nohup topocursor >/dev/null 2>&1 &`
 
-### Comandi
+### Commands
 
 ```bash
-topocursor                  # avvia
-topocursor --quit           # chiude l'istanza in esecuzione (da un altro terminale)
-topocursor --autostart on   # avvio automatico al login (~/.config/autostart); "off" per toglierlo
-topocursor --reset          # rimette config e sprite di default in ~/.config/topocursor
+topocursor                  # start
+topocursor --quit           # close the running instance (from another terminal)
+topocursor --autostart on   # start automatically at login (~/.config/autostart); "off" to remove it
+topocursor --reset          # restore the default config and sprites in ~/.config/topocursor
 topocursor --help
 ```
 
-Se non l'hai installato, l'eseguibile compilato da `run.sh` è in `src/Linux/bin/Release/net8.0/topocursor`.
+If you haven't installed it, the executable built by `run.sh` is at `src/Linux/bin/Release/net8.0/topocursor`.
 
-### Disinstallare
+### Uninstall
 
 ```bash
 topocursor --quit
 topocursor --autostart off
 rm ~/.local/bin/topocursor
-rm -r ~/.config/topocursor        # config e sprite personalizzati
+rm -r ~/.config/topocursor        # config and custom sprites
 ```
 
-### Differenze rispetto a Windows
+### Differences from Windows
 
-- **Nessuna icona nella tray**: le impostazioni si cambiano da `~/.config/topocursor/config.json`, che si ricarica da solo appena lo salvi.
-- `hideSystemCursor: "pointers"` equivale ad `"all"`: X11 permette di nascondere il cursore solo tutto insieme.
-- **Il cursore non può restare invisibile**: è il server X a nasconderlo per conto del programma, e lo rimette da solo appena la connessione si chiude, anche se il processo viene ucciso con `kill -9`. Non serve nessun watchdog.
-- Il cursore viene nascosto davvero ovunque, anche nelle app che ne usano uno personalizzato.
+- **No tray icon**: change settings in `~/.config/topocursor/config.json`, which reloads automatically as soon as you save it.
+- `hideSystemCursor: "pointers"` behaves like `"all"`, because X11 can only hide the pointer as a whole.
+- **The pointer can't stay invisible**: the X server hides it on the program's behalf and restores it by itself as soon as the connection closes, even if the process is killed with `kill -9`. No watchdog is needed.
+- The pointer is hidden everywhere, including in apps that use a custom one.
 
-### Problemi comuni
+### Troubleshooting
 
-| Sintomo | Soluzione |
+| Symptom | Fix |
 |---|---|
-| `Sessione Wayland rilevata` | Vedi il [punto 1](#1-controlla-di-essere-su-x11). |
-| `Permission denied` su `./run.sh` | Lancialo con `bash run.sh`, oppure rendilo eseguibile con `chmod +x run.sh publish.sh`. |
-| `dotnet: command not found` | L'SDK non è installato o non è nel `PATH`: vedi il [punto 2](#2-installa-net-8-sdk-e-librerie-x11). |
-| `You must install .NET to run this application` | Hai installato .NET con lo script in `~/.dotnet` ma manca `DOTNET_ROOT`: vedi il [punto 2](#2-installa-net-8-sdk-e-librerie-x11). In alternativa usa la versione di `publish.sh`, che include .NET. |
-| `Unable to load shared library 'libX11.so.6'` (o `libXfixes`, `libXi`, `libXext`) | Installa le librerie X11 del punto 2. |
-| `Impossibile connettersi al server X` | Lo stai avviando fuori dalla sessione grafica, per esempio via SSH: lancialo da un terminale del desktop. |
-| `TopoCursor è già in esecuzione` | C'è già un'istanza, magari avviata in automatico al login: `topocursor --quit`. |
-| `Ctrl+Alt+M è già usata da un'altra applicazione` | La scorciatoia è occupata. Il resto funziona: per uscire usa `topocursor --quit`. |
-| Il topo finisce sotto pannelli, menu o lock screen | Si rialza da solo nel giro di pochi centesimi di secondo, ma alcuni desktop tengono i propri pannelli sempre sopra. |
+| `Wayland session detected` | See [step 1](#1-check-that-youre-on-x11). |
+| `Permission denied` on `./run.sh` | Run it with `bash run.sh`, or make the scripts executable with `chmod +x run.sh publish.sh`. |
+| `dotnet: command not found` | The SDK isn't installed or isn't in your `PATH`: see [step 2](#2-install-the-net-8-sdk-and-the-x11-libraries). |
+| `You must install .NET to run this application` | You installed .NET with the script into `~/.dotnet` but `DOTNET_ROOT` isn't set: see [step 2](#2-install-the-net-8-sdk-and-the-x11-libraries). Alternatively, use the `publish.sh` build, which bundles .NET. |
+| `Unable to load shared library 'libX11.so.6'` (or `libXfixes`, `libXi`, `libXext`) | Install the X11 libraries from step 2. |
+| `Can't connect to the X server` | You're starting it outside the graphical session, for example over SSH: run it from a terminal on the desktop. |
+| `TopoCursor is already running` | There's already an instance, perhaps started automatically at login: `topocursor --quit`. |
+| `Ctrl+Alt+M is already used by another application` | The shortcut is taken. Everything else works: use `topocursor --quit` to exit. |
+| The mouse ends up under panels, menus or the lock screen | It raises itself again within a few hundredths of a second, but some desktops always keep their own panels on top. |
 
-Sotto Linux, `dotnet build` dell'intera soluzione richiede i target WindowsDesktop, che non tutti gli SDK Linux hanno (mancano per esempio in quelli delle distribuzioni). Per questo `run.sh` e `publish.sh` compilano solo `src/Linux`.
+On Linux, building the whole solution with `dotnet build` requires the WindowsDesktop targets, which not every Linux SDK includes (distro-packaged SDKs, for example, lack them). That's why `run.sh` and `publish.sh` build only `src/Linux`.
 
-## Cambiare lo spritesheet
+## Changing the sprite sheet
 
-Al primo avvio l'app crea la cartella di configurazione con dentro `config.json` e `mouse.png`:
+On first run the app creates its config folder with `config.json` and `mouse.png` inside:
 
 - **Windows**: `%APPDATA%\TopoCursor\`
 - **Linux**: `~/.config/topocursor/`
 
-Puoi modificarli mentre l'app gira: si ricarica da sola.
+You can edit them while the app is running: it reloads by itself.
 
-Se metti un `config.json` accanto all'eseguibile, l'app lo usa al posto della cartella di configurazione (modalità portable).
+If you put a `config.json` next to the executable, the app uses it instead of the config folder (portable mode).
 
-Lo sheet è organizzato **a righe**: ogni animazione occupa una riga, con i frame affiancati da sinistra a destra.
+The sheet is organized **in rows**: each animation takes one row, with its frames laid out left to right.
 
 ```jsonc
 {
   "spritesheet": "mouse.png",
   "frameWidth": 48, "frameHeight": 32,
-  "hotspot": { "x": 37, "y": 18 },   // pixel del frame che sta sotto il puntatore reale
-  "facing": "right",                 // verso in cui guarda lo sprite (l'app lo specchia quando vai nell'altro senso)
-  "scale": 2,                        // ingrandimento intero, nearest-neighbor
+  "hotspot": { "x": 37, "y": 18 },   // frame pixel that sits under the real pointer
+  "facing": "right",                 // direction the sprite faces (the app mirrors it when you move the other way)
+  "scale": 2,                        // integer upscaling, nearest-neighbor
   "animations": {
-    "run":   { "row": 0, "frames": 4, "fps": 12 },  // obbligatoria (fps ignorati: dipendono dalla velocità)
-    "idle":  { "row": 1, "frames": 6, "fps": 4 },   // obbligatoria
-    "sleep": { "row": 2, "frames": 4, "fps": 2 },   // facoltativa
-    "bite":  { "row": 3, "frames": 7, "fps": 14 },  // obbligatoria, suonata una volta per click
-    "drag":  { "row": 4, "frames": 4, "fps": 12 },  // facoltativa: trascinamento (fps scalati con la velocità)
-    "hold":  { "row": 5, "frames": 4, "fps": 4 }    // facoltativa: tasto premuto ma fermo durante un trascinamento
+    "run":   { "row": 0, "frames": 4, "fps": 12 },  // required (fps ignored: it depends on speed)
+    "idle":  { "row": 1, "frames": 6, "fps": 4 },   // required
+    "sleep": { "row": 2, "frames": 4, "fps": 2 },   // optional
+    "bite":  { "row": 3, "frames": 7, "fps": 14 },  // required, played once per click
+    "drag":  { "row": 4, "frames": 4, "fps": 12 },  // optional: dragging (fps scaled with speed)
+    "hold":  { "row": 5, "frames": 4, "fps": 4 }    // optional: button held but not moving during a drag
   },
   "behavior": {
-    "idleAfterMs": 140,        // dopo quanto smette di correre
-    "sleepAfterMs": 8000,      // 0 = non dorme mai
+    "idleAfterMs": 140,        // how long before it stops running
+    "sleepAfterMs": 8000,      // 0 = never sleeps
     "runFpsMin": 8, "runFpsMax": 22,
-    "runSpeedForMaxFps": 1600, // px/s a cui la corsa raggiunge runFpsMax
-    "turnThresholdPx": 6,      // isteresi prima di girarsi
+    "runSpeedForMaxFps": 1600, // px/s at which the run animation reaches runFpsMax
+    "turnThresholdPx": 6,      // hysteresis before turning around
     "biteOn": "any",           // "left" | "right" | "any"
     "dragButton": "left",      // "left" | "right" | "middle" | "none"
-    "dragThresholdPx": 5,      // movimento col tasto premuto prima che diventi trascinamento
-    "hideSystemCursor": "all"  // "all" | "pointers" (solo Windows) | "none"
+    "dragThresholdPx": 5,      // movement with the button held before it counts as a drag
+    "hideSystemCursor": "all"  // "all" | "pointers" (Windows only) | "none"
   }
 }
 ```
 
-Il PNG viene letto da un decoder interno (`src/Core/PngDecoder.cs`), identico su Windows e Linux: supporta tutti i formati PNG comuni, ma non quelli interlacciati.
+The PNG is read by a built-in decoder (`src/Core/PngDecoder.cs`) that behaves the same on Windows and Linux. It supports all common PNG formats, but not interlaced ones.
 
-Lo sprite di default viene generato da `tools/gen_sprites.py` (Python + Pillow). Puoi modificare lì colori e pose e rigenerarlo con:
+The default sprite is generated by `tools/gen_sprites.py` (Python + Pillow). You can change colors and poses there and regenerate it with:
 
 ```
 python tools/gen_sprites.py assets
 ```
 
-## Come funziona
+## How it works
 
-La logica (stati, velocità, direzione, trascinamento) sta in `src/Core/PetController.cs` ed è la stessa sulle due piattaforme. Ognuna fornisce un overlay (`IOverlay`) e una fonte di input.
+The logic (states, speed, direction, dragging) lives in `src/Core/PetController.cs` and is the same on both platforms. Each platform provides an overlay (`IOverlay`) and an input source.
 
 ### Windows
 
-- **Overlay**: una finestra popup `WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE`. Viene disegnata con `UpdateLayeredWindow`, con alpha per-pixel premoltiplicato. I click la attraversano e non ruba mai il focus.
-- **Input**: un hook `WH_MOUSE_LL` aggiorna la posizione appena arriva l'evento e intercetta i click, senza consumarli. Un timer a ~60 Hz manda avanti le animazioni e fa da fallback con `GetCursorPos`.
-- **Cursore di sistema**: viene sostituito con un cursore trasparente tramite `SetSystemCursor`. Per ripristinarlo si ricarica lo schema dell'utente con `SystemParametersInfo(SPI_SETCURSORS)`. Il ripristino avviene:
-  - all'uscita
-  - in caso di crash
-  - da parte di un piccolo processo *watchdog*, che se ne accorge anche quando l'app viene uccisa da Task Manager o fermata dal debugger
-- **Non è un Windows Service**: i servizi girano nella sessione 0 e non possono disegnare sul desktop. Per partire all'avvio usa l'opzione **Avvia con Windows**, che scrive una chiave in `HKCU\...\Run`.
+- **Overlay**: a `WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE` popup window, drawn with `UpdateLayeredWindow` using premultiplied per-pixel alpha. Clicks pass through it and it never steals focus.
+- **Input**: a `WH_MOUSE_LL` hook updates the position as soon as each event arrives and sees clicks without consuming them. A ~60 Hz timer advances the animations and falls back to `GetCursorPos`.
+- **System pointer**: replaced with a transparent cursor via `SetSystemCursor`. It is restored by reloading the user's cursor scheme with `SystemParametersInfo(SPI_SETCURSORS)`. Restoring happens:
+  - on exit
+  - on a crash
+  - from a small *watchdog* process, which notices even when the app is killed from Task Manager or stopped by the debugger
+- **Not a Windows Service**: services run in session 0 and can't draw on the desktop. To start at login, use the **Start with Windows** option, which writes a key under `HKCU\...\Run`.
 
 ### Linux (X11)
 
-- **Overlay**: una finestra *override-redirect*, quindi il window manager non la gestisce e non ha decorazioni, con input shape vuota, così i click la attraversano. Con un compositor usa un visual ARGB a 32 bit con alpha per-pixel. Senza compositor la sagoma viene ritagliata con una bounding shape. Ogni frame è una Pixmap lato server, impostata come sfondo della finestra.
-- **Input**: eventi *raw* di XInput2 sulla root window. Arrivano subito, anche mentre un'altra app ha un grab attivo (per esempio mentre trascini un'icona) e anche per i tap brevissimi del touchpad. Senza XInput2 si ripiega sul polling di `XQueryPointer`.
-- **Cursore di sistema**: `XFixesHideCursor` sulla root.
-- **Sempre in cima**: ogni ~45 ms controlla con `XQueryTree` se una finestra visibile gli è finita sopra, e in quel caso si rialza.
+- **Overlay**: an *override-redirect* window, so the window manager doesn't manage it and it has no decorations. Its input shape is empty, so clicks pass through. With a compositor it uses a 32-bit ARGB visual with per-pixel alpha. Without one, the outline is cut out with a bounding shape. Each frame is a server-side Pixmap, set as the window background.
+- **Input**: XInput2 *raw* events on the root window. They arrive immediately, even while another app holds an active grab (for example while you drag an icon), and also for very short touchpad taps. Without XInput2 it falls back to polling `XQueryPointer`.
+- **System pointer**: `XFixesHideCursor` on the root window.
+- **Always on top**: every ~45 ms it uses `XQueryTree` to check whether a visible window has ended up above it, and if so raises itself again.
 
-## Se il cursore resta invisibile (Windows)
+## If the pointer stays invisible (Windows)
 
-Succede solo se muoiono sia l'app sia il watchdog. Hai tre modi per riaverlo:
+This only happens if both the app and the watchdog die. You have three ways to get it back:
 
-- rilancia TopoCursor e chiudilo
-- esegui `TopoCursor.exe --restore` (Win+R)
-- fai logout
+- start TopoCursor again and close it
+- run `TopoCursor.exe --restore` (Win+R)
+- log out
 
-## Limiti noti
+## Known limitations
 
-- Su Windows, le app che impostano un **proprio** cursore personalizzato continuano a mostrarlo sopra il topo. Esempi: alcuni giochi, cursori CSS nei browser, software 3D.
-- L'overlay ha 1–2 frame di ritardo rispetto al cursore hardware. Nell'uso normale non si nota, nei giochi sì: mettilo in pausa con Ctrl+Alt+M.
-- A ogni frame il topo controlla se qualche finestra gli è finita sopra (menu, tooltip, taskbar, icona trascinata, app "sempre in primo piano") e si rimette in cima. Restano però sopra di lui le finestre che Windows tiene in una "banda" superiore, riservata alla shell e alle app di accessibilità firmate: menu Start, ricerca, Alt+Tab, Visualizzazione attività, centro notifiche, Game Bar.
-- Non appare sopra i giochi a schermo intero esclusivo né sul desktop sicuro di UAC.
-- Su Linux alcuni compositor o desktop possono mostrare sopra il topo i propri pannelli o le schermate di blocco: lì si rialza, ma solo se il compositor glielo permette.
+- On Windows, apps that set their **own** custom pointer keep showing it on top of the mouse. Examples: some games, CSS cursors in browsers, 3D software.
+- The overlay lags 1–2 frames behind the hardware pointer. You won't notice in normal use, but you will in games: pause it with Ctrl+Alt+M.
+- On every frame the mouse checks whether a window has ended up above it (menus, tooltips, taskbar, a dragged icon, "always on top" apps) and moves back to the top. Some windows still stay above it, because Windows keeps them in a higher "band" reserved for the shell and for signed accessibility apps: the Start menu, search, Alt+Tab, Task View, the notification center, Game Bar.
+- It doesn't appear over exclusive full-screen games or on the UAC secure desktop.
+- On Linux, some compositors or desktops may show their own panels or lock screens above the mouse. It raises itself again, but only if the compositor allows it.

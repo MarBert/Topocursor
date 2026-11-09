@@ -3,8 +3,8 @@ using static TopoCursor.Native;
 namespace TopoCursor;
 
 /// <summary>
-/// Finestra popup layered, trasparente ai click, sempre in primo piano e fuori dalla taskbar.
-/// Disegna un frame con alpha per-pixel tramite UpdateLayeredWindow.
+/// Layered popup window: click-through, always on top and not shown in the taskbar.
+/// Draws a frame with per-pixel alpha via UpdateLayeredWindow.
 /// </summary>
 public sealed class Overlay : NativeWindow, IOverlay, IDisposable
 {
@@ -57,14 +57,14 @@ public sealed class Overlay : NativeWindow, IOverlay, IDisposable
         _visible = false;
     }
 
-    /// <summary>Da chiamare prima di distruggere i bitmap dello sprite corrente.</summary>
+    /// <summary>Call before destroying the bitmaps of the current sprite.</summary>
     public void ReleaseFrame()
     {
         if (_origBmp != IntPtr.Zero) SelectObject(_memDc, _origBmp);
         _lastFrame = null;
     }
 
-    /// <summary>Altre finestre topmost (taskbar, menu Start) possono finire sopra: ci riportiamo in cima.</summary>
+    /// <summary>Other topmost windows (taskbar, Start menu) can end up above us: move back to the top.</summary>
     public void BringToTop() =>
         SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
@@ -72,10 +72,10 @@ public sealed class Overlay : NativeWindow, IOverlay, IDisposable
     long _lastRaiseMs;
 
     /// <summary>
-    /// Da chiamare a ogni frame. Se una finestra visibile sta sopra di noi e ci copre (menu contestuali,
-    /// tooltip, taskbar, immagine di trascinamento delle icone, app "sempre in primo piano"…),
-    /// torniamo in cima. Se la stessa finestra resta sopra nonostante tutto (es. menu Start, Alt+Tab,
-    /// che vivono in una "banda" di z-order superiore), riproviamo solo ogni 250 ms.
+    /// Call on every frame. If a visible window sits above us and covers us (context menus,
+    /// tooltips, taskbar, the drag image of an icon, "always on top" apps…), move back to the top.
+    /// If the same window stays above regardless (e.g. Start menu, Alt+Tab, which live in a
+    /// higher z-order "band"), retry only every 250 ms.
     /// </summary>
     public void EnsureOnTop(long nowMs)
     {
@@ -94,7 +94,7 @@ public sealed class Overlay : NativeWindow, IOverlay, IDisposable
 
     IntPtr FindCoveringWindow(int left, int top, int right, int bottom)
     {
-        // risale lo z-order a partire da noi: di solito non c'è niente sopra e il ciclo finisce subito
+        // walk up the z-order starting from us: usually there's nothing above and the loop ends at once
         int guard = 0;
         for (var h = GetWindow(Handle, GW_HWNDPREV); h != IntPtr.Zero && guard++ < 512; h = GetWindow(h, GW_HWNDPREV))
         {

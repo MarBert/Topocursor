@@ -9,7 +9,7 @@ public sealed class TrayApp : ApplicationContext
     const string AppName = "TopoCursor";
     public const string QuitEventName = @"Local\TopoCursor.Quit";
 
-    // segnalato da `TopoCursor.exe --quit` (o Ctrl+C dentro run.ps1): uscita pulita
+    // signaled by `TopoCursor.exe --quit` (or Ctrl+C inside run.ps1): clean exit
     readonly EventWaitHandle _quitEvent = new(false, EventResetMode.AutoReset, QuitEventName);
 
     readonly Overlay _overlay = new();
@@ -44,7 +44,7 @@ public sealed class TrayApp : ApplicationContext
         _overlay.HotkeyPressed += TogglePause;
 
         BuildMenu(hotkey);
-        _tray.Text = "TopoCursor – il tuo cursore squittisce";
+        _tray.Text = "TopoCursor – your pointer squeaks";
         _tray.Visible = true;
         _tray.DoubleClick += (_, _) => TogglePause();
 
@@ -53,7 +53,7 @@ public sealed class TrayApp : ApplicationContext
         _timer.Tick += OnTick;
         _timer.Start();
 
-        // ricarica automatica quando modifichi config.json o lo spritesheet
+        // reload automatically when config.json or the sprite sheet changes
         try
         {
             _watcher = new FileSystemWatcher(ConfigStore.Dir) { IncludeSubdirectories = false, EnableRaisingEvents = true };
@@ -78,14 +78,14 @@ public sealed class TrayApp : ApplicationContext
         {
             var cfg = ConfigStore.Load();
             var png = Path.Combine(ConfigStore.Dir, cfg.Spritesheet);
-            var bytes = File.ReadAllBytes(png); // niente lock sul file: si può sovrascrivere mentre gira
+            var bytes = File.ReadAllBytes(png); // no lock on the file: it can be overwritten while running
             var sprites = SpriteSet.Load(cfg, bytes, GdiFrameFactory.Instance);
             return (cfg, sprites, GdiFrameFactory.ToBitmap(SpriteSet.MakeIcon(cfg, bytes)));
         }
         catch (Exception ex)
         {
             if (showErrors)
-                MessageBox.Show($"Non riesco a caricare la configurazione:\n{ex.Message}\n\nUso lo sprite di default.",
+                MessageBox.Show($"Can't load the configuration:\n{ex.Message}\n\nUsing the default sprite.",
                     "TopoCursor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             var cfg = ConfigStore.LoadEmbedded();
             var bytes = ConfigStore.ReadEmbedded("mouse.png");
@@ -144,31 +144,31 @@ public sealed class TrayApp : ApplicationContext
         menu.Items.Add(new ToolStripMenuItem("🐭 TopoCursor") { Enabled = false });
         menu.Items.Add(new ToolStripSeparator());
 
-        _pauseItem = new ToolStripMenuItem("In pausa (cursore normale)", null, (_, _) => TogglePause())
+        _pauseItem = new ToolStripMenuItem("Paused (normal pointer)", null, (_, _) => TogglePause())
         {
             ShortcutKeyDisplayString = hotkeyOk ? "Ctrl+Alt+M" : null,
         };
         menu.Items.Add(_pauseItem);
 
-        _scaleMenu = new ToolStripMenuItem("Dimensione");
+        _scaleMenu = new ToolStripMenuItem("Size");
         foreach (var s in new[] { 1, 2, 3, 4 })
             _scaleMenu.DropDownItems.Add(new ToolStripMenuItem($"{s}×", null, (_, _) => Persist(c => c.Scale = s)) { Tag = s });
         menu.Items.Add(_scaleMenu);
 
-        _hideMenu = new ToolStripMenuItem("Nascondi cursore di sistema");
-        foreach (var (label, value) in new[] { ("Sempre", "all"), ("Solo freccia e mano (testo visibile)", "pointers"), ("Mai", "none") })
+        _hideMenu = new ToolStripMenuItem("Hide system pointer");
+        foreach (var (label, value) in new[] { ("Always", "all"), ("Arrow and hand only (text cursor visible)", "pointers"), ("Never", "none") })
             _hideMenu.DropDownItems.Add(new ToolStripMenuItem(label, null, (_, _) => Persist(c => c.Behavior.HideSystemCursor = value)) { Tag = value });
         menu.Items.Add(_hideMenu);
 
         menu.Items.Add(new ToolStripSeparator());
-        _startupItem = new ToolStripMenuItem("Avvia con Windows", null, (_, _) => ToggleStartup());
+        _startupItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => ToggleStartup());
         menu.Items.Add(_startupItem);
-        menu.Items.Add("Apri cartella sprite/config", null, (_, _) =>
+        menu.Items.Add("Open sprite/config folder", null, (_, _) =>
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{ConfigStore.Dir}\"") { UseShellExecute = true }));
-        menu.Items.Add("Ricarica sprite", null, (_, _) => Reload(showErrors: true));
-        menu.Items.Add("Ripristina sprite e config di default", null, (_, _) => ResetDefaults());
+        menu.Items.Add("Reload sprites", null, (_, _) => Reload(showErrors: true));
+        menu.Items.Add("Restore default sprites and config", null, (_, _) => ResetDefaults());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Esci", null, (_, _) => ExitThread());
+        menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
         _tray.ContextMenuStrip = menu;
         RefreshChecks();
@@ -194,16 +194,16 @@ public sealed class TrayApp : ApplicationContext
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Non riesco a salvare config.json:\n{ex.Message}", "TopoCursor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show($"Can't save config.json:\n{ex.Message}", "TopoCursor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        _reloadAt = -1; // il watcher scatterebbe comunque: ricarichiamo subito
+        _reloadAt = -1; // the watcher would fire anyway: reload right away
         Reload(showErrors: true);
     }
 
     void ResetDefaults()
     {
-        var ok = MessageBox.Show($"Sovrascrivo config.json e mouse.png in\n{ConfigStore.Dir}\ncon quelli di default?",
+        var ok = MessageBox.Show($"Overwrite config.json and mouse.png in\n{ConfigStore.Dir}\nwith the defaults?",
             "TopoCursor", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
         if (ok != DialogResult.OK) return;
         try { ConfigStore.ExtractDefaults(ConfigStore.Dir); }

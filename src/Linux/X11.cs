@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace TopoCursor.Linux;
 
-/// <summary>P/Invoke minimi verso Xlib e le estensioni usate (Shape, XFixes, XInput2). Solo LP64 (x86_64, arm64).</summary>
+/// <summary>Minimal P/Invoke into Xlib and the extensions in use (Shape, XFixes, XInput2). LP64 only (x86_64, arm64).</summary>
 internal static class X11
 {
     const string LibX11 = "libX11.so.6";
@@ -10,7 +10,7 @@ internal static class X11
     const string LibXfixes = "libXfixes.so.3";
     const string LibXi = "libXi.so.6";
 
-    // ---- costanti -----------------------------------------------------------------------------
+    // ---- constants ----------------------------------------------------------------------------
     public const int KeyPress = 2;
     public const int Expose = 12;
     public const int MappingNotify = 34;
@@ -34,7 +34,7 @@ internal static class X11
     public const int XIAllMasterDevices = 1;
     public const int XI_RawButtonPress = 15, XI_RawButtonRelease = 16, XI_RawMotion = 17;
 
-    // ---- strutture ------------------------------------------------------------------------------
+    // ---- structures ----------------------------------------------------------------------------
     [StructLayout(LayoutKind.Sequential)]
     public struct XSetWindowAttributes
     {
@@ -92,7 +92,7 @@ internal static class X11
         public IntPtr mask;
     }
 
-    // Offset nei buffer XEvent (192 byte) — layout LP64
+    // Offsets into XEvent buffers (192 bytes) — LP64 layout
     public const int Ev_KeyState = 80, Ev_KeyCode = 84;          // XKeyEvent
     public const int Cookie_Extension = 32, Cookie_EvType = 36, Cookie_Data = 48; // XGenericEventCookie
     public const int RawEvent_Detail = 56;                        // XIRawEvent.detail

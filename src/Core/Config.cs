@@ -19,23 +19,23 @@ public sealed class Hotspot
 
 public sealed class BehaviorConfig
 {
-    /// <summary>Dopo quanti ms senza movimento il topo smette di correre.</summary>
+    /// <summary>Milliseconds without movement before the mouse stops running.</summary>
     public int IdleAfterMs { get; set; } = 140;
-    /// <summary>Dopo quanti ms di inattività il topo si addormenta (0 = mai).</summary>
+    /// <summary>Milliseconds of inactivity before the mouse falls asleep (0 = never).</summary>
     public int SleepAfterMs { get; set; } = 8000;
     public double RunFpsMin { get; set; } = 8;
     public double RunFpsMax { get; set; } = 22;
-    /// <summary>Velocità (px/s) alla quale la corsa raggiunge RunFpsMax.</summary>
+    /// <summary>Pointer speed (px/s) at which the run animation reaches RunFpsMax.</summary>
     public double RunSpeedForMaxFps { get; set; } = 1600;
-    /// <summary>Pixel orizzontali nella direzione opposta prima che il topo si giri.</summary>
+    /// <summary>Horizontal pixels in the opposite direction before the mouse turns around.</summary>
     public int TurnThresholdPx { get; set; } = 6;
-    /// <summary>"left", "right" o "any".</summary>
+    /// <summary>"left", "right" or "any".</summary>
     public string BiteOn { get; set; } = "any";
-    /// <summary>Tasto che fa "aggrappare" il topo quando trascini: "left", "right" o "none".</summary>
+    /// <summary>Button that makes the mouse "grab on" while dragging: "left", "right", "middle" or "none".</summary>
     public string DragButton { get; set; } = "left";
-    /// <summary>Pixel di movimento col tasto premuto prima che diventi un trascinamento.</summary>
+    /// <summary>Pixels of movement with the button held before it counts as a drag.</summary>
     public int DragThresholdPx { get; set; } = 5;
-    /// <summary>"all", "pointers" (freccia, mano, attesa; solo Windows, su Linux equivale ad "all") o "none".</summary>
+    /// <summary>"all", "pointers" (arrow, hand, busy; Windows only, same as "all" on Linux) or "none".</summary>
     public string HideSystemCursor { get; set; } = "all";
 }
 
@@ -45,7 +45,7 @@ public sealed class AppConfig
     public int FrameWidth { get; set; } = 48;
     public int FrameHeight { get; set; } = 32;
     public Hotspot Hotspot { get; set; } = new() { X = 37, Y = 18 };
-    /// <summary>Verso in cui guarda lo sprite nello sheet: "right" o "left".</summary>
+    /// <summary>Direction the sprite faces in the sheet: "right" or "left".</summary>
     public string Facing { get; set; } = "right";
     public int Scale { get; set; } = 2;
     public Dictionary<string, AnimDef> Animations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -53,9 +53,9 @@ public sealed class AppConfig
 }
 
 /// <summary>
-/// Trova/crea la cartella di configurazione.
-/// Modalità portable: config.json accanto all'eseguibile. Altrimenti %APPDATA%\TopoCursor su Windows
-/// o ~/.config/topocursor su Linux (creata al primo avvio con config e sprite di default).
+/// Finds/creates the config folder.
+/// Portable mode: config.json next to the executable. Otherwise %APPDATA%\TopoCursor on Windows
+/// or ~/.config/topocursor on Linux (created on first run with the default config and sprites).
 /// </summary>
 public static class ConfigStore
 {
@@ -80,7 +80,7 @@ public static class ConfigStore
             Dir = exeDir;
             return;
         }
-        // Windows: %APPDATA%\TopoCursor — Linux: $XDG_CONFIG_HOME/topocursor (di solito ~/.config/topocursor)
+        // Windows: %APPDATA%\TopoCursor — Linux: $XDG_CONFIG_HOME/topocursor (usually ~/.config/topocursor)
         Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             OperatingSystem.IsWindows() ? "TopoCursor" : "topocursor");
         Directory.CreateDirectory(Dir);
@@ -99,7 +99,7 @@ public static class ConfigStore
 
     public static Stream OpenEmbedded(string name) =>
         typeof(ConfigStore).Assembly.GetManifestResourceStream(name)
-        ?? throw new InvalidOperationException($"Risorsa incorporata mancante: {name}");
+        ?? throw new InvalidOperationException($"Missing embedded resource: {name}");
 
     public static byte[] ReadEmbedded(string name)
     {
@@ -112,8 +112,8 @@ public static class ConfigStore
     public static AppConfig Load()
     {
         var cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(ConfigPath), Json)
-                  ?? throw new InvalidDataException("config.json vuoto");
-        // Il deserializzatore crea un dizionario case-sensitive: lo normalizziamo.
+                  ?? throw new InvalidDataException("config.json is empty");
+        // The deserializer creates a case-sensitive dictionary: normalize it.
         cfg.Animations = new Dictionary<string, AnimDef>(cfg.Animations, StringComparer.OrdinalIgnoreCase);
         Validate(cfg);
         return cfg;
@@ -131,10 +131,10 @@ public static class ConfigStore
 
     static void Validate(AppConfig c)
     {
-        if (c.FrameWidth <= 0 || c.FrameHeight <= 0) throw new InvalidDataException("frameWidth/frameHeight devono essere > 0");
+        if (c.FrameWidth <= 0 || c.FrameHeight <= 0) throw new InvalidDataException("frameWidth/frameHeight must be > 0");
         foreach (var required in new[] { "run", "idle", "bite" })
             if (!c.Animations.ContainsKey(required))
-                throw new InvalidDataException($"Manca l'animazione obbligatoria \"{required}\"");
+                throw new InvalidDataException($"Missing required animation \"{required}\"");
         c.Scale = Math.Clamp(c.Scale, 1, 8);
     }
 }

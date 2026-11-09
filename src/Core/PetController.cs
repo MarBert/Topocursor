@@ -3,14 +3,14 @@ using System.Diagnostics;
 namespace TopoCursor;
 
 /// <summary>
-/// Macchina a stati del topolino:
-///   run   – il mouse si sta muovendo (velocità dell'animazione proporzionale alla velocità del puntatore)
-///   idle  – fermo da poco: respira, muove i baffi, sbatte le palpebre
-///   sleep – fermo da molto: dorme con le Z
-///   bite  – al click addenta il formaggio (one-shot, poi torna a idle/run)
-///   drag  – trascinamento: si aggrappa al formaggio
-///   hold  – tasto premuto ma fermo durante un trascinamento: abbraccia il formaggio
-/// Non dipende dalla piattaforma: riceve input da Windows (hook) o Linux (XInput2) e disegna su un IOverlay.
+/// The mouse's state machine:
+///   run   – the pointer is moving (animation speed follows the pointer speed)
+///   idle  – stopped recently: breathes, twitches its whiskers, blinks
+///   sleep – stopped for a long time: sleeps with Z's
+///   bite  – on click it bites the cheese (one-shot, then back to idle/run)
+///   drag  – dragging: hangs on to the cheese
+///   hold  – button held but not moving during a drag: hugs the cheese
+/// Platform-independent: gets input from Windows (hook) or Linux (XInput2) and draws on an IOverlay.
 /// </summary>
 public sealed class PetController
 {
@@ -23,13 +23,13 @@ public sealed class PetController
 
     int _x, _y;
     bool _hasPos;
-    double _lastMoveMs = -1e9;      // ultimo movimento "significativo"
-    double _lastActivityMs;         // movimento o click
+    double _lastMoveMs = -1e9;      // last "meaningful" movement
+    double _lastActivityMs;         // movement or click
     double _lastMoveEventMs;
-    double _speed;                  // px/s, media esponenziale
-    double _jitter;                 // movimento accumulato sotto soglia
+    double _speed;                  // px/s, exponential moving average
+    double _jitter;                 // movement accumulated below the threshold
     bool _faceLeft;
-    // direzione: decisa sullo spostamento orizzontale netto recente, non sul singolo evento
+    // direction: decided on the recent net horizontal movement, not on a single event
     const double TurnWindowMs = 150, MinTurnIntervalMs = 160;
     readonly Queue<(double t, int x)> _xHistory = new();
     double _lastTurnMs = -1e9;
@@ -41,7 +41,7 @@ public sealed class PetController
     bool _biting;
     double _lastTickMs;
 
-    // trascinamento: tasto premuto + movimento oltre soglia → il topo si aggrappa al formaggio
+    // dragging: button held + movement past the threshold → the mouse grabs on to the cheese
     bool _dragBtnDown;
     bool _dragging;
     int _pressX, _pressY;
@@ -74,7 +74,7 @@ public sealed class PetController
         else { _lastActivityMs = Now; Render(); }
     }
 
-    /// <summary>Movimento riportato dalla fonte di eventi della piattaforma (hook / XInput2): la più tempestiva.</summary>
+    /// <summary>Movement reported by the platform's event source (hook / XInput2): the most timely one.</summary>
     public void OnMove(int x, int y)
     {
         _lastHookMs = Now;
@@ -90,13 +90,13 @@ public sealed class PetController
             if (dx == 0 && dy == 0) return;
             double dist = Math.Sqrt(dx * dx + dy * dy);
 
-            // velocità istantanea (gli eventi dell'hook arrivano a 125–1000 Hz)
+            // instantaneous speed (hook events arrive at 125–1000 Hz)
             double dt = Math.Max(now - _lastMoveEventMs, 4);
             double inst = Math.Min(dist / dt * 1000.0, 20000);
             _speed = _speed * 0.75 + inst * 0.25;
             _lastMoveEventMs = now;
 
-            // ignora micro-vibrazioni del sensore per lo stato (non per la posizione)
+            // ignore sensor micro-jitter for the state (not for the position)
             _jitter += dist;
             if (_jitter >= 2 || now - _lastMoveMs < _b.IdleAfterMs)
             {
@@ -105,8 +105,8 @@ public sealed class PetController
                 _lastActivityMs = now;
             }
 
-            // giro: conta lo spostamento netto degli ultimi ~150 ms, così un singolo campione
-            // "all'indietro" (rumore, arrotondamenti, correzioni ai bordi) non fa girare il topo
+            // turning: use the net movement over the last ~150 ms, so a single "backwards" sample
+            // (noise, rounding, screen-edge corrections) doesn't make the mouse turn around
             _xHistory.Enqueue((now, x));
             while (_xHistory.Count > 1 && now - _xHistory.Peek().t > TurnWindowMs) _xHistory.Dequeue();
             int net = x - _xHistory.Peek().x;
@@ -123,7 +123,7 @@ public sealed class PetController
             Math.Abs(x - _pressX) + Math.Abs(y - _pressY) >= _b.DragThresholdPx)
         {
             _dragging = true;
-            _biting = false; // il morso lascia il posto alla presa
+            _biting = false; // the bite gives way to the grab
         }
 
         UpdateState(now);
@@ -170,7 +170,7 @@ public sealed class PetController
         if (!match) return;
 
         _lastActivityMs = Now;
-        // click ripetuti: riparte dallo slancio, così sembra che sgranocchi
+        // repeated clicks: restart from the wind-up frame, so it looks like nibbling
         int restart = _biting ? Math.Min(1, _sprites.Get("bite").Count - 1) : 0;
         _biting = true;
         SetState("bite", restart);
@@ -183,18 +183,18 @@ public sealed class PetController
         double dt = Math.Clamp(now - _lastTickMs, 0, 250);
         _lastTickMs = now;
 
-        // Fallback solo se la fonte di eventi tace (es. su Windows una finestra elevata in primo piano,
-        // su Linux un server X senza XInput2). Mentre gli eventi arrivano NON va usato: su Windows l'hook
-        // riceve la posizione nuova un attimo prima che il cursore si sposti davvero, e il polling
-        // restituirebbe quella vecchia facendo "rimbalzare" il topo all'indietro (e girarsi per un istante).
+        // Fallback only when the event source is silent (e.g. an elevated window in the foreground on Windows,
+        // an X server without XInput2 on Linux). It must NOT be used while events are arriving: on Windows the hook
+        // gets the new position slightly before the cursor actually moves, and polling would return the old one,
+        // making the mouse "bounce" backwards (and turn around for an instant).
         if (now - _lastHookMs > 50 && _pointer.TryGetPosition(out var px, out var py) && (px != _x || py != _y)) MoveTo(px, py);
 
-        // fallback se si perde il rilascio del tasto (es. rilasciato sopra una finestra elevata)
+        // fallback if the button release is missed (e.g. released over an elevated window)
         if (_dragBtnDown && !_pointer.AnyButtonDown()) EndDrag();
 
         if (now - _lastMoveEventMs > 60) _speed *= 0.8;
 
-        // avanza i frame
+        // advance the frames
         var anim = _sprites.Get(_state);
         double fps = _state is "run" or "drag" ? RunFps() * anim.Fps / Math.Max(_sprites.Get("run").Fps, 1) : anim.Fps;
         _frameAcc += dt / 1000.0 * fps;
@@ -228,11 +228,11 @@ public sealed class PetController
     {
         if (_dragging)
         {
-            // mentre si muove resta appeso ("drag"), se ti fermi col tasto premuto abbraccia il formaggio ("hold")
+            // while moving it hangs on ("drag"); if you stop with the button held it hugs the cheese ("hold")
             bool moving = now - _lastMoveMs < _b.IdleAfterMs;
             string d = moving || !_sprites.Has("hold") ? "drag" : "hold";
             if (d != _state) SetState(d, 0);
-            _lastActivityMs = now; // non si addormenta mentre trascini
+            _lastActivityMs = now; // never falls asleep while dragging
             return;
         }
         if (_biting) return;

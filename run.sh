@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila e avvia TopoCursor per Linux (X11). Ctrl+C lo chiude in modo pulito.
+# Builds and starts TopoCursor for Linux (X11). Ctrl+C closes it cleanly.
 set -euo pipefail
 cd "$(dirname "$0")"
 dotnet build src/Linux/TopoCursor.Linux.csproj -c Release --nologo -v q

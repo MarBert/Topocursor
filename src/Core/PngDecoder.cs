@@ -3,7 +3,7 @@ using System.IO.Compression;
 
 namespace TopoCursor;
 
-/// <summary>Immagine 32 bit: pixel ARGB non premoltiplicati, riga per riga dall'alto.</summary>
+/// <summary>32-bit image: non-premultiplied ARGB pixels, row by row from the top.</summary>
 public sealed class Image32
 {
     public required int Width { get; init; }
@@ -12,9 +12,9 @@ public sealed class Image32
 }
 
 /// <summary>
-/// Decoder PNG minimale e senza dipendenze (System.Drawing su Linux non esiste).
-/// Supporta tutti i tipi colore (grigio, RGB, palette, grigio+alpha, RGBA), profondità 1–16 bit,
-/// trasparenza tRNS. Non supporta i PNG interlacciati (Adam7), rari per gli spritesheet.
+/// Minimal, dependency-free PNG decoder (System.Drawing doesn't exist on Linux).
+/// Supports every color type (gray, RGB, palette, gray+alpha, RGBA), bit depths 1–16
+/// and tRNS transparency. Interlaced (Adam7) PNGs are not supported; they're rare for sprite sheets.
 /// </summary>
 public static class PngDecoder
 {
@@ -23,7 +23,7 @@ public static class PngDecoder
     public static Image32 Decode(byte[] png)
     {
         if (png.Length < 8 || !png.AsSpan(0, 8).SequenceEqual(Signature))
-            throw new InvalidDataException("Il file non è un PNG valido.");
+            throw new InvalidDataException("The file is not a valid PNG.");
 
         int width = 0, height = 0, bitDepth = 0, colorType = 0, interlace = 0;
         byte[]? palette = null, trns = null;
@@ -34,7 +34,7 @@ public static class PngDecoder
         {
             int len = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(pos));
             string type = System.Text.Encoding.ASCII.GetString(png, pos + 4, 4);
-            if (len < 0 || pos + 12 + len > png.Length) throw new InvalidDataException("PNG troncato.");
+            if (len < 0 || pos + 12 + len > png.Length) throw new InvalidDataException("Truncated PNG.");
             var data = png.AsSpan(pos + 8, len);
             switch (type)
             {
@@ -53,22 +53,22 @@ public static class PngDecoder
             if (type == "IEND") break;
         }
 
-        if (width <= 0 || height <= 0) throw new InvalidDataException("PNG senza intestazione IHDR valida.");
+        if (width <= 0 || height <= 0) throw new InvalidDataException("PNG without a valid IHDR header.");
         if (interlace != 0)
-            throw new InvalidDataException("PNG interlacciato non supportato: riesporta lo spritesheet senza interlacciamento.");
+            throw new InvalidDataException("Interlaced PNGs are not supported: re-export the sprite sheet without interlacing.");
 
         int channels = colorType switch
         {
             0 => 1, 2 => 3, 3 => 1, 4 => 2, 6 => 4,
-            _ => throw new InvalidDataException($"Tipo colore PNG {colorType} non valido."),
+            _ => throw new InvalidDataException($"Invalid PNG color type {colorType}."),
         };
-        if (colorType == 3 && palette == null) throw new InvalidDataException("PNG a palette senza PLTE.");
+        if (colorType == 3 && palette == null) throw new InvalidDataException("Palette PNG without a PLTE chunk.");
 
         int bitsPerPixel = channels * bitDepth;
-        int bpp = Math.Max(1, bitsPerPixel / 8);          // byte per pixel ai fini dei filtri
+        int bpp = Math.Max(1, bitsPerPixel / 8);          // bytes per pixel, as used by the filters
         int stride = (width * bitsPerPixel + 7) / 8;
 
-        // decompressione zlib
+        // zlib decompression
         var raw = new byte[(stride + 1) * height];
         idat.Position = 0;
         using (var z = new ZLibStream(idat, CompressionMode.Decompress))
@@ -77,12 +77,12 @@ public static class PngDecoder
             while (read < raw.Length)
             {
                 int n = z.Read(raw, read, raw.Length - read);
-                if (n == 0) throw new InvalidDataException("Dati PNG incompleti.");
+                if (n == 0) throw new InvalidDataException("Incomplete PNG data.");
                 read += n;
             }
         }
 
-        // rimozione dei filtri, in place
+        // undo the row filters
         var prev = new byte[stride];
         var cur = new byte[stride];
         var pixels = new uint[width * height];
@@ -119,14 +119,14 @@ public static class PngDecoder
                     cur[i] += (byte)(pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
                 }
                 break;
-            default: throw new InvalidDataException($"Filtro PNG {filter} non valido.");
+            default: throw new InvalidDataException($"Invalid PNG filter {filter}.");
         }
     }
 
     static void ConvertRow(byte[] row, Span<uint> dst, int colorType, int depth, byte[]? palette, byte[]? trns)
     {
         int w = dst.Length;
-        // campione n-esimo della riga, ridotto a 8 bit (per 16 bit prende il byte alto)
+        // n-th sample of the row, reduced to 8 bits (for 16-bit images, the high byte)
         int Sample(int index)
         {
             switch (depth)
@@ -139,7 +139,7 @@ public static class PngDecoder
                     return v;
             }
         }
-        // per il confronto con tRNS servono i valori a piena profondità
+        // comparing against tRNS needs the full-depth values
         int Full(int index) => depth == 16 ? (row[index * 2] << 8) | row[index * 2 + 1] : Sample(index);
         int Scale(int v) => depth >= 8 ? v : v * 255 / ((1 << depth) - 1);
 

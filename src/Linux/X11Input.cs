@@ -4,11 +4,11 @@ using static TopoCursor.Linux.X11;
 namespace TopoCursor.Linux;
 
 /// <summary>
-/// Input globale del puntatore su X11, senza "rubare" niente alle altre applicazioni:
-/// - XInput2 raw events sulla root: movimento e click arrivano subito, anche durante i grab di altre app
-///   (es. mentre trascini un'icona) e anche i tap brevissimi del touchpad;
-/// - se XInput2 non c'è, polling di XQueryPointer (il controller lo fa da solo a ogni tick);
-/// - scorciatoia globale Ctrl+Alt+M con XGrabKey.
+/// Global pointer input on X11, without "stealing" anything from other applications:
+/// - XInput2 raw events on the root window: movement and clicks arrive immediately, even during other apps' grabs
+///   (e.g. while you drag an icon) and even for very short touchpad taps;
+/// - without XInput2, XQueryPointer polling (the controller does it by itself on every tick);
+/// - global Ctrl+Alt+M shortcut via XGrabKey.
 /// </summary>
 internal sealed class X11Input : IPointerSource
 {
@@ -42,7 +42,7 @@ internal sealed class X11Input : IPointerSource
                 int major = 2, minor = 2;
                 if (XIQueryVersion(_d, ref major, ref minor) == 0 && (major > 2 || (major == 2 && minor >= 1)))
                 {
-                    // XI 2.1+: i raw event arrivano sempre, anche con grab attivi di altri client
+                    // XI 2.1+: raw events always arrive, even while other clients hold grabs
                     var bits = new byte[4];
                     SetBit(bits, XI_RawButtonPress);
                     SetBit(bits, XI_RawButtonRelease);
@@ -62,10 +62,10 @@ internal sealed class X11Input : IPointerSource
                 }
             }
         }
-        catch (DllNotFoundException) { /* libXi assente: si va di polling */ }
+        catch (DllNotFoundException) { /* libXi missing: fall back to polling */ }
         catch (EntryPointNotFoundException) { }
 
-        // ---- Ctrl+Alt+M (con e senza BlocMaiusc / BlocNum) ----
+        // ---- Ctrl+Alt+M (with and without Caps Lock / Num Lock) ----
         _hotkeyCode = XKeysymToKeycode(_d, XStringToKeysym("m"));
         if (_hotkeyCode != 0)
         {
@@ -82,7 +82,7 @@ internal sealed class X11Input : IPointerSource
 
     void RefreshButtonMap()
     {
-        // rispetta l'eventuale mappatura per mancini (pulsante fisico 1 → logico 3)
+        // honor a left-handed mapping, if any (physical button 1 → logical 3)
         _mapLen = XGetPointerMapping(_d, _buttonMap, _buttonMap.Length);
     }
 
@@ -94,7 +94,7 @@ internal sealed class X11Input : IPointerSource
             1 => PetButton.Left,
             2 => PetButton.Middle,
             3 => PetButton.Right,
-            _ => null, // 4–7 rotella, altri pulsanti extra: ignorati
+            _ => null, // 4–7 wheel, other extra buttons: ignored
         };
     }
 
@@ -108,9 +108,9 @@ internal sealed class X11Input : IPointerSource
     public bool AnyButtonDown() =>
         QueryPointer(out _, out _, out var m) && (m & (Button1Mask | Button2Mask | Button3Mask)) != 0;
 
-    // ---- eventi --------------------------------------------------------------------------------------
+    // ---- events -------------------------------------------------------------------------------------
 
-    /// <summary>Gestisce un evento X. Restituisce true se riguardava il movimento (da coalescere).</summary>
+    /// <summary>Handles an X event. Returns true if it was about movement (to be coalesced).</summary>
     public bool Handle(IntPtr ev, out bool expose)
     {
         expose = false;
@@ -143,7 +143,7 @@ internal sealed class X11Input : IPointerSource
                             var b = Logical(Marshal.ReadInt32(data, RawEvent_Detail));
                             if (b is { } btn)
                             {
-                                // posizione aggiornata prima del click, così il morso/la presa partono dal punto giusto
+                                // update the position before the click, so the bite/grab starts from the right spot
                                 FlushMove();
                                 if (evtype == XI_RawButtonPress) ButtonDown?.Invoke(btn);
                                 else ButtonUp?.Invoke(btn);
@@ -157,7 +157,7 @@ internal sealed class X11Input : IPointerSource
         return false;
     }
 
-    /// <summary>Dopo un gruppo di raw motion: una sola XQueryPointer per la posizione assoluta.</summary>
+    /// <summary>After a batch of raw motion events: a single XQueryPointer for the absolute position.</summary>
     public void FlushMove()
     {
         if (QueryPointer(out int x, out int y, out var m))
@@ -167,7 +167,7 @@ internal sealed class X11Input : IPointerSource
         }
     }
 
-    /// <summary>Senza XInput2: rileva pressioni/rilasci confrontando lo stato dei pulsanti fra un polling e l'altro.</summary>
+    /// <summary>Without XInput2: detects presses/releases by comparing the button state between polls.</summary>
     public void PollButtons()
     {
         if (HasXInput2 || !QueryPointer(out _, out _, out var m)) return;

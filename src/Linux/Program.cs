@@ -5,27 +5,27 @@ using static TopoCursor.Linux.X11;
 namespace TopoCursor.Linux;
 
 /// <summary>
-/// TopoCursor per Linux (X11).
-///   topocursor                 avvia (Ctrl+C o Ctrl+Alt+M per pausa/ripresa)
-///   topocursor --quit          chiude l'istanza in esecuzione
-///   topocursor --autostart on  avvia automaticamente al login (off per disattivare)
-///   topocursor --reset         rimette config e sprite di default in ~/.config/topocursor
-///   topocursor --force         prova ad avviarsi anche sotto Wayland (XWayland)
+/// TopoCursor for Linux (X11).
+///   topocursor                 start (Ctrl+C to quit, Ctrl+Alt+M to pause/resume)
+///   topocursor --quit          close the running instance
+///   topocursor --autostart on  start automatically at login (off to disable)
+///   topocursor --reset         restore the default config and sprites in ~/.config/topocursor
+///   topocursor --force         try to start even under Wayland (XWayland)
 /// </summary>
 internal static class Program
 {
     static volatile bool _quit;
     static volatile bool _reloadRequested;
-    static long _reloadAtMs = -1;              // ricarica ritardata dopo una modifica ai file (debounce)
+    static long _reloadAtMs = -1;              // delayed reload after a file change (debounce)
     static readonly Stopwatch Clock = Stopwatch.StartNew();
 
     static int _xErrors;
-    static readonly XErrorHandler ErrorHandler = OnXError; // riferimento statico: il GC non deve raccoglierlo
+    static readonly XErrorHandler ErrorHandler = OnXError; // static reference: the GC must not collect it
 
     static int OnXError(IntPtr display, IntPtr errorEvent)
     {
         Interlocked.Increment(ref _xErrors);
-        return 0; // non terminare il processo (comportamento predefinito di Xlib)
+        return 0; // don't terminate the process (Xlib's default behavior)
     }
 
     static string RuntimeDir =>
@@ -43,15 +43,15 @@ internal static class Program
         if (Has("--help") || Has("-h"))
         {
             Console.WriteLine("""
-                TopoCursor – il cursore diventa un topolino (X11)
+                TopoCursor – your pointer becomes a little mouse (X11)
 
-                  topocursor                 avvia (Ctrl+C per uscire, Ctrl+Alt+M per pausa/ripresa)
-                  topocursor --quit          chiude l'istanza in esecuzione
-                  topocursor --autostart on  avvio automatico al login (off per disattivarlo)
-                  topocursor --reset         ripristina config e sprite di default
-                  topocursor --force         prova comunque anche sotto Wayland
+                  topocursor                 start (Ctrl+C to quit, Ctrl+Alt+M to pause/resume)
+                  topocursor --quit          close the running instance
+                  topocursor --autostart on  start automatically at login (off to disable)
+                  topocursor --reset         restore the default config and sprites
+                  topocursor --force         try anyway under Wayland
 
-                Config e sprite: ~/.config/topocursor (si ricaricano da soli quando li modifichi)
+                Config and sprites: ~/.config/topocursor (reloaded automatically when you edit them)
                 """);
             return 0;
         }
@@ -64,22 +64,22 @@ internal static class Program
         if (Has("--reset"))
         {
             ConfigStore.ExtractDefaults(ConfigStore.Dir);
-            Console.WriteLine($"Config e sprite di default ripristinati in {ConfigStore.Dir}");
+            Console.WriteLine($"Default config and sprites restored in {ConfigStore.Dir}");
             return 0;
         }
 
         if (IsWayland() && !Has("--force"))
         {
             Console.Error.WriteLine("""
-                Sessione Wayland rilevata: TopoCursor per Linux funziona solo con X11.
-                Sotto Wayland un'app non può leggere la posizione globale del puntatore né disegnare sopra le altre finestre.
-                Scegli la sessione "Xorg"/"X11" dalla schermata di login, oppure riprova con --force (sotto XWayland
-                il topo seguirà il puntatore solo sopra le finestre X11).
+                Wayland session detected: TopoCursor for Linux only works with X11.
+                On Wayland an app can't read the global pointer position or draw on top of other windows.
+                Pick an "Xorg"/"X11" session on the login screen, or retry with --force (under XWayland
+                the mouse will follow the pointer only over X11 windows).
                 """);
             return 2;
         }
 
-        // ---- istanza singola ----
+        // ---- single instance ----
         FileStream lockFile;
         try
         {
@@ -87,7 +87,7 @@ internal static class Program
         }
         catch (IOException)
         {
-            Console.Error.WriteLine("TopoCursor è già in esecuzione (usa --quit per chiuderlo).");
+            Console.Error.WriteLine("TopoCursor is already running (use --quit to close it).");
             return 1;
         }
 
@@ -108,7 +108,7 @@ internal static class Program
         var d = XOpenDisplay(null);
         if (d == IntPtr.Zero)
         {
-            Console.Error.WriteLine("Impossibile connettersi al server X (DISPLAY non impostato?).");
+            Console.Error.WriteLine("Can't connect to the X server (is DISPLAY set?).");
             return 1;
         }
         XSetErrorHandler(ErrorHandler);
@@ -126,7 +126,7 @@ internal static class Program
         input.ButtonDown += pet.OnButton;
         input.ButtonUp += pet.OnButtonUp;
 
-        // ---- cursore di sistema ----
+        // ---- system pointer ----
         bool xfixes = XFixesQueryExtension(d, out _, out _) != 0;
         if (xfixes) { int maj = 4, min = 0; XFixesQueryVersion(d, ref maj, ref min); xfixes = maj >= 4; }
         bool cursorHidden = false;
@@ -144,20 +144,20 @@ internal static class Program
         {
             pet.SetPaused(!pet.Paused);
             ApplyCursor(pet.Paused);
-            Console.WriteLine(pet.Paused ? "In pausa (cursore normale)." : "Ripreso.");
+            Console.WriteLine(pet.Paused ? "Paused (normal pointer)." : "Resumed.");
         };
 
         using var watcher = WatchConfig();
 
-        Console.WriteLine($"TopoCursor avviato – compositor: {(overlay.Compositor ? "sì" : "no")}, " +
-                          $"XInput2: {(input.HasXInput2 ? "sì" : "no (polling)")}, " +
-                          $"nascondi cursore: {(cursorHidden ? "sì" : "no")}.");
+        Console.WriteLine($"TopoCursor started – compositor: {(overlay.Compositor ? "yes" : "no")}, " +
+                          $"XInput2: {(input.HasXInput2 ? "yes" : "no (polling)")}, " +
+                          $"hide pointer: {(cursorHidden ? "yes" : "no")}.");
         Console.WriteLine(input.HotkeyGrabbed
-            ? "Ctrl+C per uscire, Ctrl+Alt+M per pausa/ripresa."
-            : "Ctrl+C per uscire (Ctrl+Alt+M è già usata da un'altra applicazione).");
-        Console.WriteLine($"Config e sprite: {ConfigStore.Dir}");
+            ? "Ctrl+C to quit, Ctrl+Alt+M to pause/resume."
+            : "Ctrl+C to quit (Ctrl+Alt+M is already used by another application).");
+        Console.WriteLine($"Config and sprites: {ConfigStore.Dir}");
 
-        // ---- loop principale ----
+        // ---- main loop ----
         var ev = Marshal.AllocHGlobal(XEventSize);
         var pfd = new PollFd { fd = XConnectionNumber(d), events = POLLIN };
         const int TickMs = 15;
@@ -168,7 +168,7 @@ internal static class Program
             {
                 long now = Clock.ElapsedMilliseconds;
                 int timeout = (int)Math.Clamp(nextTick - now, 0, TickMs);
-                if (!input.HasXInput2) timeout = Math.Min(timeout, 8); // polling dei pulsanti più fitto
+                if (!input.HasXInput2) timeout = Math.Min(timeout, 8); // poll the buttons more often
                 if (XPending(d) == 0) poll(ref pfd, 1, timeout);
 
                 bool moved = false, expose = false;
@@ -192,7 +192,7 @@ internal static class Program
                         pet.Tick();
                         if (ticks % 3 == 0) overlay.EnsureOnTop(now);
                     }
-                    // il compositor può partire/fermarsi: ogni ~2 s ricontrolliamo e rigeneriamo le sagome
+                    // the compositor can start/stop: re-check every ~2 s and rebuild the shape masks
                     if (ticks % 133 == 0 && overlay.RefreshCompositor()) _reloadRequested = true;
                 }
 
@@ -207,8 +207,8 @@ internal static class Program
                     cfg = ncfg; sprites = nsprites;
                     pet.Swap(sprites, cfg.Behavior);
                     old.Dispose();
-                    ApplyCursor(pet.Paused); // hideSystemCursor potrebbe essere cambiato
-                    Console.WriteLine("Sprite e config ricaricati.");
+                    ApplyCursor(pet.Paused); // hideSystemCursor may have changed
+                    Console.WriteLine("Sprites and config reloaded.");
                 }
             }
         }
@@ -220,8 +220,8 @@ internal static class Program
             overlay.ReleaseFrame();
             sprites.Dispose();
             overlay.Dispose();
-            XCloseDisplay(d); // anche se il processo venisse ucciso, chiudere la connessione rimette il cursore
-            Console.WriteLine("TopoCursor chiuso.");
+            XCloseDisplay(d); // even if the process were killed, closing the connection restores the pointer
+            Console.WriteLine("TopoCursor closed.");
         }
         return 0;
     }
@@ -236,8 +236,8 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Non riesco a caricare la configurazione: {ex.Message}");
-            if (verbose) Console.Error.WriteLine("Uso lo sprite di default.");
+            Console.Error.WriteLine($"Can't load the configuration: {ex.Message}");
+            if (verbose) Console.Error.WriteLine("Using the default sprite.");
             var cfg = ConfigStore.LoadEmbedded();
             return (cfg, SpriteSet.Load(cfg, ConfigStore.ReadEmbedded("mouse.png"), factory));
         }
@@ -267,17 +267,17 @@ internal static class Program
     {
         if (!File.Exists(PidPath) || !int.TryParse(File.ReadAllText(PidPath).Trim(), out int pid))
         {
-            Console.WriteLine("TopoCursor non è in esecuzione.");
+            Console.WriteLine("TopoCursor is not running.");
             return 0;
         }
         if (kill(pid, SIGTERM) != 0)
         {
-            Console.WriteLine("TopoCursor non è in esecuzione.");
+            Console.WriteLine("TopoCursor is not running.");
             TryDelete(PidPath);
             return 0;
         }
         for (int i = 0; i < 30 && File.Exists(PidPath); i++) Thread.Sleep(100);
-        Console.WriteLine("TopoCursor chiuso.");
+        Console.WriteLine("TopoCursor closed.");
         return 0;
     }
 
@@ -290,7 +290,7 @@ internal static class Program
         if (mode.Equals("off", StringComparison.OrdinalIgnoreCase))
         {
             TryDelete(file);
-            Console.WriteLine("Avvio automatico disattivato.");
+            Console.WriteLine("Autostart disabled.");
             return 0;
         }
 
@@ -303,13 +303,13 @@ internal static class Program
             [Desktop Entry]
             Type=Application
             Name=TopoCursor
-            Comment=Il cursore diventa un topolino
+            Comment=Your pointer becomes a little mouse
             Exec={exec}
             Terminal=false
             X-GNOME-Autostart-enabled=true
 
             """);
-        Console.WriteLine($"Avvio automatico attivato: {file}");
+        Console.WriteLine($"Autostart enabled: {file}");
         return 0;
     }
 
@@ -318,7 +318,7 @@ internal static class Program
         try { File.Delete(path); } catch { }
     }
 
-    /// <summary>SIGINT (Ctrl+C), SIGTERM (--quit, kill) e SIGHUP (terminale chiuso) → uscita pulita.</summary>
+    /// <summary>SIGINT (Ctrl+C), SIGTERM (--quit, kill) and SIGHUP (terminal closed) → clean exit.</summary>
     sealed class SignalGuard : IDisposable
     {
         readonly PosixSignalRegistration[] _regs;
@@ -328,7 +328,7 @@ internal static class Program
             _regs = new[] { PosixSignal.SIGINT, PosixSignal.SIGTERM, PosixSignal.SIGHUP }
                 .Select(s => PosixSignalRegistration.Create(s, ctx =>
                 {
-                    ctx.Cancel = true; // niente terminazione immediata: esce il loop principale
+                    ctx.Cancel = true; // no immediate termination: the main loop exits instead
                     onSignal();
                 }))
                 .ToArray();

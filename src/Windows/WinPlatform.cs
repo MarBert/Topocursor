@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace TopoCursor;
 
-/// <summary>Frame del Core → HBITMAP (DIB 32 bit top-down) per UpdateLayeredWindow.</summary>
+/// <summary>Core frame → HBITMAP (32-bit top-down DIB) for UpdateLayeredWindow.</summary>
 public sealed class GdiFrameFactory : IFrameFactory
 {
     public static readonly GdiFrameFactory Instance = new();
@@ -19,14 +19,14 @@ public sealed class GdiFrameFactory : IFrameFactory
             biBitCount = 32,
         };
         var hbmp = Native.CreateDIBSection(IntPtr.Zero, ref bmi, 0, out var bits, IntPtr.Zero, 0);
-        if (hbmp == IntPtr.Zero) throw new InvalidOperationException("CreateDIBSection fallita");
-        Marshal.Copy((int[])(object)f.Pixels, 0, bits, f.Pixels.Length); // già BGRA premoltiplicato
+        if (hbmp == IntPtr.Zero) throw new InvalidOperationException("CreateDIBSection failed");
+        Marshal.Copy((int[])(object)f.Pixels, 0, bits, f.Pixels.Length); // already premultiplied BGRA
         return hbmp;
     }
 
     public void Destroy(object native) => Native.DeleteObject((IntPtr)native);
 
-    /// <summary>Immagine del Core (ARGB non premoltiplicato) → Bitmap GDI+, per l'icona della tray.</summary>
+    /// <summary>Core image (non-premultiplied ARGB) → GDI+ Bitmap, for the tray icon.</summary>
     public static Bitmap ToBitmap(Image32 img)
     {
         var bmp = new Bitmap(img.Width, img.Height, PixelFormat.Format32bppArgb);
@@ -41,7 +41,7 @@ public sealed class GdiFrameFactory : IFrameFactory
     }
 }
 
-/// <summary>Stato del puntatore letto direttamente (fallback del controller quando l'hook tace).</summary>
+/// <summary>Pointer state read directly (the controller's fallback when the hook is silent).</summary>
 public sealed class WinPointer : IPointerSource
 {
     public static readonly WinPointer Instance = new();

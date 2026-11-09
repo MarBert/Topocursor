@@ -7,14 +7,14 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
-        // TopoCursor.exe --restore  → rimette i cursori di sistema ed esce (utile se il processo è stato ucciso)
+        // TopoCursor.exe --restore  → restores the system cursors and exits (useful if the process was killed)
         if (args.Contains("--restore", StringComparer.OrdinalIgnoreCase))
         {
             CursorHider.Restore();
             return 0;
         }
 
-        // TopoCursor.exe --quit  → chiede all'istanza in esecuzione di chiudersi in modo pulito
+        // TopoCursor.exe --quit  → asks the running instance to close cleanly
         if (args.Contains("--quit", StringComparer.OrdinalIgnoreCase))
         {
             try
@@ -22,12 +22,12 @@ internal static class Program
                 using var ev = EventWaitHandle.OpenExisting(TrayApp.QuitEventName);
                 ev.Set();
             }
-            catch (WaitHandleCannotBeOpenedException) { /* nessuna istanza attiva */ }
+            catch (WaitHandleCannotBeOpenedException) { /* no running instance */ }
             return 0;
         }
 
-        // Processo intermedio: lancia il guardiano ed esce subito. Così il guardiano resta "orfano"
-        // e non fa parte dell'albero di processi che `dotnet run`/Ctrl+C/il debugger uccidono insieme all'app.
+        // Intermediate process: launches the watchdog and exits immediately. That way the watchdog is "orphaned"
+        // and isn't part of the process tree that `dotnet run`/Ctrl+C/the debugger kill along with the app.
         int sp = Array.FindIndex(args, a => a.Equals("--spawn-watchdog", StringComparison.OrdinalIgnoreCase));
         if (sp >= 0 && sp + 1 < args.Length)
         {
@@ -43,12 +43,12 @@ internal static class Program
             return 0;
         }
 
-        // Processo "guardiano": aspetta la morte dell'istanza principale e ripristina i cursori,
-        // anche se quella è stata terminata brutalmente (Task Manager, stop del debugger, Ctrl+C…).
+        // Watchdog process: waits for the main instance to die and restores the cursors,
+        // even if it was killed abruptly (Task Manager, debugger stop, Ctrl+C…).
         int wd = Array.FindIndex(args, a => a.Equals("--watchdog", StringComparison.OrdinalIgnoreCase));
         if (wd >= 0 && wd + 1 < args.Length && int.TryParse(args[wd + 1], out var pid))
         {
-            try { Process.GetProcessById(pid).WaitForExit(); } catch { /* già terminato */ }
+            try { Process.GetProcessById(pid).WaitForExit(); } catch { /* already exited */ }
             CursorHider.Restore();
             return 0;
         }
@@ -56,7 +56,7 @@ internal static class Program
         using var mutex = new Mutex(true, @"Local\TopoCursor.SingleInstance", out bool first);
         if (!first) return 0;
 
-        // Pulisce un eventuale stato lasciato da una sessione precedente
+        // Clean up any state left over from a previous session
         CursorHider.Restore();
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => CursorHider.Restore();
@@ -65,7 +65,7 @@ internal static class Program
         Application.ThreadException += (_, e) =>
         {
             CursorHider.Restore();
-            MessageBox.Show(e.Exception.ToString(), "TopoCursor – errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(e.Exception.ToString(), "TopoCursor – error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Application.Exit();
         };
 
@@ -103,7 +103,7 @@ internal static class Program
         }
         catch
         {
-            // non fondamentale
+            // not essential
         }
     }
 }

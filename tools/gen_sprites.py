@@ -1,11 +1,11 @@
 """
-Genera lo spritesheet di default del topolino (pixel art) + una GIF di anteprima.
+Generates the default pixel-art mouse sprite sheet + a preview GIF.
 
-  python gen_sprites.py [cartella_output]
+  python gen_sprites.py [output_folder]
 
-Layout dello sheet: una riga per animazione, frame da 48x32 px, topo rivolto a destra.
-Righe: 0 run (4), 1 idle (6), 2 sleep (4), 3 bite (7).
-Hotspot (punta del naso) = (37, 18): e' il punto che "clicca".
+Sheet layout: one row per animation, 48x32 px frames, mouse facing right.
+Rows: 0 run (4), 1 idle (6), 2 sleep (4), 3 bite (7), 4 drag (4), 5 hold (4).
+Hotspot (tip of the nose) = (37, 18): the point that "clicks".
 """
 import math
 import os
@@ -68,24 +68,24 @@ def leg(d, x, top, bottom, near=True):
 
 def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
           eye="open", head=(0, 0), whisk=0, sleep=False, cheeks=False):
-    """Disegna il topo. ox/oy spostamento globale, b bob del corpo, head offset testa."""
+    """Draws the mouse. ox/oy global offset, b body bob, head head offset."""
     d = ImageDraw.Draw(img)
     hx, hy = head
-    gy = 27 + oy  # riga del suolo
+    gy = 27 + oy  # ground row
 
-    # --- coda (dietro a tutto)
+    # --- tail (behind everything)
     if sleep:
         tail(d, 9 + ox, gy - 1, tail_phase, length=9, lie=True)
     else:
         tail(d, 9 + ox, 22 + oy + b, tail_phase)
 
-    # --- zampe lato lontano
+    # --- far-side legs
     if legs and not sleep:
         (ff, fb), (nf, nb) = legs
         leg(d, 24 + ox + ff[0], 22 + oy, gy + ff[1], near=False)
         leg(d, 13 + ox + fb[0], 22 + oy, gy + fb[1], near=False)
 
-    # --- orecchio (dietro la testa)
+    # --- ear (behind the head)
     ear = (22 + ox + hx, 7 + oy + b + hy, 29 + ox + hx, 14 + oy + b + hy)
     if sleep:
         ear = (21 + ox, 11 + oy, 28 + ox, 18 + oy)
@@ -93,7 +93,7 @@ def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
     ell(d, inset(ear), FUR)
     ell(d, inset(ear, 2), PINK)
 
-    # --- corpo + testa come unica sagoma con contorno
+    # --- body + head as a single outlined shape
     if sleep:
         body = (7 + ox, 16 + oy - breathe, 27 + ox, 27 + oy)
         headb = (21 + ox, 15 + oy, 32 + ox, 26 + oy)
@@ -107,7 +107,7 @@ def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
         ell(d, s, OUT)
     for s in (body, headb, snout):
         ell(d, inset(s), FUR)
-    # pancia e riflesso sul dorso
+    # belly and highlight on the back
     bx0, by0, bx1, by1 = body
     ell(d, (bx0 + 4, by1 - 6, bx1 - 3, by1 - 1), BELLY)
     ell(d, (bx0 + 4, by0 + 2, bx0 + 11, by0 + 4), FUR_LIGHT)
@@ -115,18 +115,18 @@ def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
         sx0, sy0, sx1, sy1 = snout
         ell(d, (sx0, sy0 + 2, sx0 + 5, sy1 - 1), FUR_LIGHT)
 
-    # --- zampe lato vicino (davanti al corpo, solo i piedini)
+    # --- near-side legs (in front of the body, just the feet)
     if legs and not sleep:
         (ff, fb), (nf, nb) = legs
         for lx, (dx, dy) in ((22 + ox, nf), (11 + ox, nb)):
             d.rectangle((lx + dx - 1, gy - 1 + dy, lx + dx + 2, gy + dy), fill=OUT)
             d.rectangle((lx + dx, gy - 1 + dy, lx + dx + 1, gy - 1 + dy), fill=PINK)
     if sleep:
-        # zampine raccolte sotto il muso
+        # paws tucked under the snout
         d.rectangle((26 + ox, gy - 1, 29 + ox, gy), fill=OUT)
         d.rectangle((27 + ox, gy - 1, 28 + ox, gy - 1), fill=PINK)
 
-    # --- occhio
+    # --- eye
     if sleep:
         ex, ey = 28 + ox, 20 + oy
     else:
@@ -144,12 +144,12 @@ def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
         d.rectangle((ex, ey - 1, ex + 1, ey + 1), fill=EYE)
         d.point((ex, ey - 1), fill=WHITE)
 
-    # --- naso (la punta e' l'hotspot quando il topo e' fermo/in corsa)
+    # --- nose (its tip is the hotspot while the mouse is idle/running)
     sx1 = snout[2]
     ny = (snout[1] + snout[3]) // 2 - 1
     d.rectangle((sx1 - 1, ny, sx1, ny + 1), fill=NOSE)
 
-    # --- baffi
+    # --- whiskers
     if not sleep:
         wx = sx1 - 4
         d.line((wx, ny + 2, wx + 7, ny + 1 - whisk), fill=WHISKER)
@@ -157,19 +157,19 @@ def mouse(img, *, ox=0, oy=0, b=0, breathe=0, legs=None, tail_phase=0.0,
     return d
 
 
-# ---- formaggio ---------------------------------------------------------------
+# ---- cheese --------------------------------------------------------------
 def cheese(img, ox=0, oy=0, bites=0, crumbs=()):
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    # spicchio visto di lato: lato alto a destra, pendenza verso sinistra
+    # wedge seen from the side: tall side on the right, sloping to the left
     poly = [(36 + ox, 27 + oy), (47 + ox, 27 + oy), (47 + ox, 15 + oy), (36 + ox, 22 + oy)]
     d.polygon(poly, fill=CHEESE, outline=CHEESE_OUT)
-    # faccia superiore piu' chiara
+    # lighter top face
     d.line((37 + ox, 22 + oy, 46 + ox, 16 + oy), fill=CHEESE_LIGHT)
     d.line((46 + ox, 17 + oy, 46 + ox, 26 + oy), fill=CHEESE_DARK)
     for hx, hy, r in ((40, 24, 1), (43, 20, 1), (44, 25, 0)):
         d.rectangle((hx + ox, hy + oy, hx + ox + r, hy + oy + r), fill=CHEESE_HOLE)
-    # morsi: cerchi "scavati" lungo il bordo alto sinistro
+    # bites: circles "carved out" along the top-left edge
     px = layer.load()
     for i in range(bites):
         cx, cy, r = 37.5 + i * 2.6 + ox, 21.0 - i * 1.6 + oy, 2.3
@@ -197,9 +197,9 @@ def frame():
     return Image.new("RGBA", (FW, FH), (0, 0, 0, 0))
 
 
-# ---- animazioni ------------------------------------------------------------------
+# ---- animations -----------------------------------------------------------------
 def run_frames():
-    # legs: ((far_front, far_back), (near_front, near_back)), ognuno (dx, dy)
+    # legs: ((far_front, far_back), (near_front, near_back)), each (dx, dy)
     cfg = [
         dict(b=0, legs=(((2, 0), (-2, 0)), ((-1, 0), (1, 0))), ph=0.0),
         dict(b=-1, legs=(((0, -1), (0, 0)), ((0, 0), (0, -1))), ph=1.6),
@@ -252,7 +252,7 @@ def sleep_frames():
 
 def bite_frames():
     seq = [
-        # (testa, occhio, morsi, briciole, guance)
+        # (head, eye, bites, crumbs, cheeks)
         dict(head=(0, 0), eye="open", bites=0, crumbs=(), cheeks=False),
         dict(head=(-1, -2), eye="wide", bites=0, crumbs=(), cheeks=False),
         dict(head=(2, 1), eye="happy", bites=0, crumbs=(), cheeks=False),
@@ -277,7 +277,7 @@ def bite_frames():
 
 
 def paw(d, x, y):
-    """Zampina anteriore che stringe qualcosa (3x2 con contorno)."""
+    """Front paw gripping something (3x2 with outline)."""
     d.rectangle((x - 1, y - 1, x + 2, y + 1), fill=OUT)
     d.rectangle((x, y, x + 1, y), fill=PINK)
 
@@ -298,8 +298,8 @@ def speed_lines(d, phase):
 
 
 def drag_frames():
-    # Trascinato: il topo si tiene al formaggio (gia' morso), sollevato da terra,
-    # zampe posteriori che penzolano, coda al vento, oscillazione a pendolo.
+    # Dragged: the mouse holds on to the cheese, lifted off the ground,
+    # hind legs dangling, tail in the wind, pendulum swing.
     cfg = [
         dict(oy=-2, legs=(((1, 1), (-1, 2)), ((0, 2), (1, 1))), ph=0.0, eye="happy"),
         dict(oy=-3, legs=(((0, 2), (0, 1)), ((1, 1), (-1, 2))), ph=1.6, eye="closed"),
@@ -315,7 +315,7 @@ def drag_frames():
         mouse(m, ox=-2, oy=c["oy"], legs=c["legs"], tail_phase=c["ph"], eye=c["eye"], head=(1, 1), whisk=i % 2)
         f.alpha_composite(m)
         d = ImageDraw.Draw(f)
-        # zampe anteriori aggrappate al lato del formaggio
+        # front paws gripping the side of the cheese
         paw(d, 35, 17 + c["oy"] + 3)
         paw(d, 35, 20 + c["oy"] + 3)
         out.append(f)
@@ -323,7 +323,7 @@ def drag_frames():
 
 
 def hold_frames():
-    # Fermo con il tasto premuto: abbraccia il formaggio, felice.
+    # Still with the button held: hugs the cheese, happily.
     seq = [
         dict(breathe=0, eye="happy", heart=None),
         dict(breathe=1, eye="happy", heart=(31, 6)),
@@ -361,7 +361,7 @@ def main():
             sheet.alpha_composite(f, (c * FW, r * FH))
     sheet.save(os.path.join(outdir, "mouse.png"))
 
-    # anteprima: sheet ingrandito + gif animata su sfondo chiaro
+    # preview: enlarged sheet + animated GIF on a light background
     sheet.resize((sheet.width * 6, sheet.height * 6), Image.NEAREST).save(os.path.join(outdir, "mouse_preview_sheet.png"))
     gif = []
     for name, frames, fps in rows:

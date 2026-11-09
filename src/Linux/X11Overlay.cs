@@ -4,10 +4,10 @@ using static TopoCursor.Linux.X11;
 namespace TopoCursor.Linux;
 
 /// <summary>
-/// Finestra X11 override-redirect (niente decorazioni, il window manager non la gestisce) che non riceve input
-/// (input shape vuota → i click la attraversano). Con un compositor usa un visual ARGB a 32 bit con alpha per-pixel;
-/// senza compositor ritaglia la sagoma dello sprite con una bounding shape (alpha ≥ 50%).
-/// Ogni frame è una Pixmap lato server: disegnare = impostarla come sfondo della finestra.
+/// Override-redirect X11 window (no decorations, not managed by the window manager) that receives no input
+/// (empty input shape → clicks pass through). With a compositor it uses a 32-bit ARGB visual with per-pixel alpha;
+/// without one it cuts out the sprite outline with a bounding shape (alpha ≥ 50%).
+/// Each frame is a server-side Pixmap: drawing = setting it as the window background.
 /// </summary>
 internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
 {
@@ -67,25 +67,25 @@ internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
             CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWColormap, ref attrs);
         XStoreName(_d, _win, "TopoCursor");
 
-        // tipo "drag and drop": i compositor di solito non ci mettono ombre né animazioni
+        // "drag and drop" type: compositors usually add no shadows or animations to it
         var type = XInternAtom(_d, "_NET_WM_WINDOW_TYPE", 0);
         var dnd = XInternAtom(_d, "_NET_WM_WINDOW_TYPE_DND", 0);
         XChangeProperty(_d, _win, type, XA_ATOM, 32, PropModeReplace, new[] { (nint)dnd }, 1);
 
-        // nessuna area di input: click, rotella e hover passano alle finestre sotto
+        // no input area: clicks, wheel and hover go to the windows below
         if (_hasShape) XShapeCombineRectangles(_d, _win, ShapeInput, 0, 0, IntPtr.Zero, 0, ShapeSet, Unsorted);
     }
 
     bool DetectCompositor(int screen) =>
         XGetSelectionOwner(_d, XInternAtom(_d, $"_NET_WM_CM_S{screen}", 0)) != 0;
 
-    /// <summary>Il compositor può essere avviato/fermato mentre giriamo (es. picom): da ricontrollare ogni tanto.</summary>
+    /// <summary>The compositor can be started/stopped while we run (e.g. picom): re-check now and then.</summary>
     public bool RefreshCompositor()
     {
         bool now = DetectCompositor(XDefaultScreen(_d));
         if (now == Compositor) return false;
         Compositor = now;
-        return true; // le maschere vanno rigenerate: il chiamante ricarica gli sprite
+        return true; // the masks must be rebuilt: the caller reloads the sprites
     }
 
     // ---- IFrameFactory ---------------------------------------------------------------------------
@@ -95,22 +95,22 @@ internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
         var nf = new NativeFrame { Pixmap = XCreatePixmap(_d, _win, (uint)f.Width, (uint)f.Height, (uint)_depth) };
         if (_gc == IntPtr.Zero) _gc = XCreateGC(_d, nf.Pixmap, 0, IntPtr.Zero);
 
-        // XImage 32 bpp: i pixel premoltiplicati 0xAARRGGBB vanno bene così (con visual a 24 bit l'alpha viene ignorato)
+        // 32 bpp XImage: premultiplied 0xAARRGGBB pixels work as they are (with a 24-bit visual alpha is ignored)
         int bytes = f.Width * f.Height * 4;
         var data = Marshal.AllocHGlobal(bytes);
         try
         {
             Marshal.Copy((int[])(object)f.Pixels, 0, data, f.Pixels.Length);
             var img = XCreateImage(_d, _visual, (uint)_depth, ZPixmap, 0, data, (uint)f.Width, (uint)f.Height, 32, f.Width * 4);
-            if (img == IntPtr.Zero) throw new InvalidOperationException("XCreateImage fallita");
+            if (img == IntPtr.Zero) throw new InvalidOperationException("XCreateImage failed");
             XPutImage(_d, nf.Pixmap, _gc, img, 0, 0, 0, 0, (uint)f.Width, (uint)f.Height);
-            Marshal.WriteIntPtr(img, 16, IntPtr.Zero); // XImage.data: lo liberiamo noi, non XFree
+            Marshal.WriteIntPtr(img, 16, IntPtr.Zero); // XImage.data: we free it ourselves, not XFree
             XFree(img);
         }
         finally { Marshal.FreeHGlobal(data); }
 
-        // sagoma: serve senza compositor (niente alpha), ma la impostiamo sempre così eventuali ombre
-        // o bordi aggiunti dal compositor seguono il profilo del topo invece del rettangolo
+        // outline: needed without a compositor (no alpha), but always set so that any shadows or
+        // borders added by the compositor follow the mouse's outline instead of the rectangle
         if (_hasShape)
         {
             uint threshold = Compositor ? 1u : 128u;
@@ -176,26 +176,26 @@ internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
 
     public void ReleaseFrame()
     {
-        // lo sfondo della finestra referenzia la pixmap: la sganciamo prima che venga liberata
+        // the window background references the pixmap: detach it before it gets freed
         XSetWindowBackgroundPixmap(_d, _win, 0);
         _lastFrame = null;
         _lastW = _lastH = 0;
     }
 
-    /// <summary>Ridisegna dopo un Expose (es. il compositor è stato riavviato).</summary>
+    /// <summary>Redraws after an Expose (e.g. the compositor was restarted).</summary>
     public void Redraw()
     {
         if (_visible) XClearWindow(_d, _win);
     }
 
-    // ---- sempre in cima ------------------------------------------------------------------------------
+    // ---- always on top ------------------------------------------------------------------------------
 
     nuint _lastCover;
     long _lastRaiseMs;
 
     /// <summary>
-    /// Se una finestra visibile ci sta sopra e ci copre (menu, tooltip, pannelli, finestre "sempre in primo piano"),
-    /// torniamo in cima. Se la stessa finestra resta sopra comunque, riproviamo solo ogni 250 ms.
+    /// If a visible window sits above us and covers us (menus, tooltips, panels, "always on top" windows),
+    /// move back to the top. If the same window stays above anyway, retry only every 250 ms.
     /// </summary>
     public void EnsureOnTop(long nowMs)
     {
@@ -218,7 +218,7 @@ internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
         if (XQueryTree(_d, _root, out _, out _, out var children, out uint n) == 0 || children == IntPtr.Zero) return 0;
         try
         {
-            // i figli della root sono in ordine di stacking dal basso verso l'alto
+            // the root's children are in stacking order, bottom to top
             int self = -1;
             for (int i = (int)n - 1; i >= 0; i--)
                 if ((nuint)Marshal.ReadIntPtr(children, i * IntPtr.Size) == _win) { self = i; break; }
@@ -242,6 +242,6 @@ internal sealed class X11Overlay : IOverlay, IFrameFactory, IDisposable
         ReleaseFrame();
         if (_gc != IntPtr.Zero) XFreeGC(_d, _gc);
         XDestroyWindow(_d, _win);
-        XFlush(_d); // la colormap (se nostra) viene liberata alla chiusura della connessione
+        XFlush(_d); // the colormap (if ours) is freed when the connection closes
     }
 }
