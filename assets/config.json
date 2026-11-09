@@ -1,0 +1,28 @@
+{
+  "spritesheet": "mouse.png",
+  "frameWidth": 48,
+  "frameHeight": 32,
+  "hotspot": { "x": 37, "y": 18 },
+  "facing": "right",
+  "scale": 2,
+  "animations": {
+    "run":   { "row": 0, "frames": 4, "fps": 12 },
+    "idle":  { "row": 1, "frames": 6, "fps": 4 },
+    "sleep": { "row": 2, "frames": 4, "fps": 2 },
+    "bite":  { "row": 3, "frames": 7, "fps": 14 },
+    "drag":  { "row": 4, "frames": 4, "fps": 12 },
+    "hold":  { "row": 5, "frames": 4, "fps": 4 }
+  },
+  "behavior": {
+    "idleAfterMs": 140,
+    "sleepAfterMs": 8000,
+    "runFpsMin": 8,
+    "runFpsMax": 22,
+    "runSpeedForMaxFps": 1600,
+    "turnThresholdPx": 6,
+    "biteOn": "any",
+    "dragButton": "left",
+    "dragThresholdPx": 5,
+    "hideSystemCursor": "all"
+  }
+}
