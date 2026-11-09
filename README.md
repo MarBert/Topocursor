@@ -66,38 +66,138 @@ Una volta partito, l'app vive nella **tray** (icona col topolino). Dal menu puoi
 
 ## Linux
 
-Funziona con le sessioni **X11** (Xorg), con o senza compositor. Servono le librerie `libX11`, `libXext`, `libXfixes` e `libXi`, già presenti su qualsiasi desktop X11.
+Funziona con le sessioni **X11** (Xorg), con o senza compositor. **Wayland non è supportato**: per sicurezza, sotto Wayland un'app normale non può leggere la posizione globale del puntatore né disegnare sopra le altre finestre. Se il programma rileva una sessione Wayland, si ferma e lo spiega.
 
-> **Wayland non è supportato.** Per sicurezza, sotto Wayland un'app normale non può leggere la posizione globale del puntatore né disegnare sopra le altre finestre. Se il programma rileva una sessione Wayland, si ferma e lo spiega. Di solito dalla schermata di login puoi scegliere la sessione "Xorg"/"X11" (GNOME, KDE, Cinnamon, XFCE, MATE…).
-
-Per compilare serve il .NET 8 SDK:
+### 1. Controlla di essere su X11
 
 ```bash
-./run.sh
+echo $XDG_SESSION_TYPE
 ```
 
-Compila e avvia. **Ctrl+C** lo chiude in modo pulito, **Ctrl+Alt+M** lo mette in pausa e lo riprende.
+Se risponde `x11` sei a posto e puoi passare al punto 2. Se risponde `wayland`, dipende dal desktop:
 
-Gli altri comandi:
+| Desktop | X11 disponibile? |
+|---|---|
+| XFCE, Cinnamon (Linux Mint), MATE, i3, Openbox e altri window manager X11 | Sì, di solito è la sessione predefinita. |
+| KDE Plasma fino alla 6.7 | Sì: nella schermata di login scegli **Plasma (X11)**. Su alcune distro va prima installata la sessione X11 (su Arch il pacchetto `plasma-x11-session`). Da Plasma 6.8 la sessione X11 non esiste più. |
+| GNOME fino alla 48 (es. Ubuntu 24.04 LTS, Debian 13) | Sì: nella schermata di login, dopo aver scelto l'utente, clicca la rotellina in basso a destra e scegli **Ubuntu on Xorg** / **GNOME on Xorg**. |
+| GNOME 49 e successivi (es. Ubuntu 25.10 e successive, Fedora 43 e successive) | **No**: GNOME non ha più una sessione X11. L'unica strada è installare accanto un desktop X11, per esempio XFCE o Cinnamon, e sceglierlo al login. |
+
+### 2. Installa .NET 8 SDK e librerie X11
+
+Le librerie X11 sono già presenti su qualsiasi desktop X11, ma il comando le installa nel caso manchino.
+
+**Ubuntu** (22.04 e successive)
 
 ```bash
+sudo apt install dotnet-sdk-8.0 libx11-6 libxext6 libxfixes3 libxi6
+```
+
+**Debian**: .NET non è nei repository ufficiali, quindi si aggiunge prima quello Microsoft (qui per Debian 12; per un'altra versione sostituisci `12`):
+
+```bash
+wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb
+sudo apt update && sudo apt install dotnet-sdk-8.0 libx11-6 libxext6 libxfixes3 libxi6
+```
+
+**Fedora**
+
+```bash
+sudo dnf install dotnet-sdk-8.0 libX11 libXext libXfixes libXi
+```
+
+**Arch / Manjaro**
+
+```bash
+sudo pacman -S dotnet-sdk-8.0 libx11 libxext libxfixes libxi
+```
+
+**Qualsiasi distro, senza root**: usa lo script ufficiale, che installa in `~/.dotnet`:
+
+```bash
+curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 8.0
+echo 'export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc && source ~/.bashrc
+```
+
+Per controllare l'installazione: `dotnet --list-sdks` deve elencare un SDK `8.x`. Una versione più recente da sola non basta, perché per avviarlo serve il runtime 8.
+
+### 3. Scarica, compila e prova
+
+```bash
+git clone https://github.com/MarBert/Topocursor.git
+cd Topocursor
+bash run.sh
+```
+
+`run.sh` compila solo il progetto Linux e lo avvia nel terminale. **Ctrl+C** lo chiude in modo pulito, **Ctrl+Alt+M** lo mette in pausa e lo riprende.
+
+Al primo avvio stampa una riga come questa:
+
+```
+TopoCursor avviato – compositor: sì, XInput2: sì, nascondi cursore: sì.
+```
+
+Le voci della riga:
+
+- **compositor**: con `sì` hai la trasparenza vera; con `no` funziona lo stesso, ma i bordi semitrasparenti vengono tagliati netti.
+- **XInput2**: con `no (polling)` funziona comunque, ma i tap velocissimi del touchpad potrebbero sfuggire.
+
+### 4. Installalo in modo permanente (facoltativo)
+
+Crea un eseguibile singolo che include .NET: puoi copiarlo dove vuoi e non serve più l'SDK.
+
+```bash
+bash publish.sh                                              # → publish-linux/topocursor (ARM: bash publish.sh linux-arm64)
+install -Dm755 publish-linux/topocursor ~/.local/bin/topocursor
+topocursor --autostart on                                    # parte da solo a ogni login
+```
+
+Se il terminale dice `topocursor: command not found`, la cartella `~/.local/bin` non è nel `PATH`. Esci e rientra nella sessione, oppure usa il percorso completo `~/.local/bin/topocursor`.
+
+Per avviarlo subito senza terminale: `nohup topocursor >/dev/null 2>&1 &`
+
+### Comandi
+
+```bash
+topocursor                  # avvia
 topocursor --quit           # chiude l'istanza in esecuzione (da un altro terminale)
-topocursor --autostart on   # avvio automatico al login (~/.config/autostart), "off" per toglierlo
-topocursor --reset          # rimette config e sprite di default
+topocursor --autostart on   # avvio automatico al login (~/.config/autostart); "off" per toglierlo
+topocursor --reset          # rimette config e sprite di default in ~/.config/topocursor
+topocursor --help
 ```
 
-L'eseguibile compilato è in `src/Linux/bin/Release/net8.0/topocursor`. Per un eseguibile singolo che non richiede .NET installato:
+Se non l'hai installato, l'eseguibile compilato da `run.sh` è in `src/Linux/bin/Release/net8.0/topocursor`.
+
+### Disinstallare
 
 ```bash
-./publish.sh               # → publish-linux/topocursor (linux-x64; ./publish.sh linux-arm64 per ARM)
+topocursor --quit
+topocursor --autostart off
+rm ~/.local/bin/topocursor
+rm -r ~/.config/topocursor        # config e sprite personalizzati
 ```
 
-Differenze rispetto a Windows:
+### Differenze rispetto a Windows
 
-- **Nessuna icona nella tray**: le impostazioni si cambiano da `config.json`, che si ricarica da solo.
+- **Nessuna icona nella tray**: le impostazioni si cambiano da `~/.config/topocursor/config.json`, che si ricarica da solo appena lo salvi.
 - `hideSystemCursor: "pointers"` equivale ad `"all"`: X11 permette di nascondere il cursore solo tutto insieme.
 - **Il cursore non può restare invisibile**: è il server X a nasconderlo per conto del programma, e lo rimette da solo appena la connessione si chiude, anche se il processo viene ucciso con `kill -9`. Non serve nessun watchdog.
 - Il cursore viene nascosto davvero ovunque, anche nelle app che ne usano uno personalizzato.
+
+### Problemi comuni
+
+| Sintomo | Soluzione |
+|---|---|
+| `Sessione Wayland rilevata` | Vedi il [punto 1](#1-controlla-di-essere-su-x11). |
+| `Permission denied` su `./run.sh` | Lancialo con `bash run.sh`, oppure rendilo eseguibile con `chmod +x run.sh publish.sh`. |
+| `dotnet: command not found` | L'SDK non è installato o non è nel `PATH`: vedi il [punto 2](#2-installa-net-8-sdk-e-librerie-x11). |
+| `You must install .NET to run this application` | Hai installato .NET con lo script in `~/.dotnet` ma manca `DOTNET_ROOT`: vedi il [punto 2](#2-installa-net-8-sdk-e-librerie-x11). In alternativa usa la versione di `publish.sh`, che include .NET. |
+| `Unable to load shared library 'libX11.so.6'` (o `libXfixes`, `libXi`, `libXext`) | Installa le librerie X11 del punto 2. |
+| `Impossibile connettersi al server X` | Lo stai avviando fuori dalla sessione grafica, per esempio via SSH: lancialo da un terminale del desktop. |
+| `TopoCursor è già in esecuzione` | C'è già un'istanza, magari avviata in automatico al login: `topocursor --quit`. |
+| `Ctrl+Alt+M è già usata da un'altra applicazione` | La scorciatoia è occupata. Il resto funziona: per uscire usa `topocursor --quit`. |
+| Il topo finisce sotto pannelli, menu o lock screen | Si rialza da solo nel giro di pochi centesimi di secondo, ma alcuni desktop tengono i propri pannelli sempre sopra. |
 
 Sotto Linux, `dotnet build` dell'intera soluzione richiede i target WindowsDesktop, che non tutti gli SDK Linux hanno (mancano per esempio in quelli delle distribuzioni). Per questo `run.sh` e `publish.sh` compilano solo `src/Linux`.
 
